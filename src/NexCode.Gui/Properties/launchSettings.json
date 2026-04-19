@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "NexCode.Gui (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "NexCode.Gui (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

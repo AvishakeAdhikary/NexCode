@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option csharp_namespace = "NexCode.Remote";
+
+package nexcode.remote;
+
+service RemoteControl {
+  rpc GetRemoteHealth (RemoteHealthRequest) returns (RemoteHealthReply);
+}
+
+message RemoteHealthRequest {
+}
+
+message RemoteHealthReply {
+  string service_name = 1;
+  string state = 2;
+  string version = 3;
+  string transport = 4;
+  string message = 5;
+}

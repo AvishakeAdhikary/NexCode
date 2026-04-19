@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: dotnet restore NexCode.slnx
+
+      - name: Build
+        run: dotnet build NexCode.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test NexCode.slnx --configuration Release --no-build --logger trx
+
+      - name: Generate OSS license inventory
+        shell: pwsh
+        run: .\scripts\build\Generate-OssLicenses.ps1
+
+      - name: Publish packaged GUI output
+        shell: pwsh
+        run: |
+          dotnet publish src/NexCode.Gui/NexCode.Gui.csproj `
+            -c Release `
+            -r win-x64 `
+            -p:PublishProfile=win-x64.pubxml
+
+          dotnet msbuild src/NexCode.Gui/NexCode.Gui.csproj `
+            /t:Publish `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:AppxPackageDir=.\msix-output\
+
+      - name: Decode signing certificate
+        if: ${{ secrets.SIGNING_CERTIFICATE_PFX != '' }}
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes(
+            'nexcode-signing-cert.pfx',
+            [Convert]::FromBase64String('${{ secrets.SIGNING_CERTIFICATE_PFX }}'))
+
+      - name: Sign MSIX package
+        if: ${{ secrets.SIGNING_CERTIFICATE_PFX != '' }}
+        shell: pwsh
+        run: |
+          .\scripts\build\Sign-Msix.ps1 `
+            -PackageDirectory .\msix-output `
+            -CertificatePath .\nexcode-signing-cert.pfx `
+            -CertificatePassword "${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}"
+
+      - name: Create checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path release-assets -Force | Out-Null
+          Get-ChildItem .\msix-output -Recurse -Include *.msix,*.appx | Copy-Item -Destination .\release-assets -Force
+          Get-ChildItem .\release-assets | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            "$hash  $($_.Name)" | Out-File -FilePath .\release-assets\SHA256SUMS.txt -Append -Encoding utf8
+          }
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/*

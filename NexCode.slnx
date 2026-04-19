@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/NexCode.Cli/NexCode.Cli.csproj" />
+    <Project Path="src/NexCode.Data/NexCode.Data.csproj" />
+    <Project Path="src/NexCode.Gui/NexCode.Gui.csproj">
+      <Platform Solution="Debug|*" Project="x64" />
+    </Project>
+    <Project Path="src/NexCode.Marketplace.Sdk/NexCode.Marketplace.Sdk.csproj" />
+    <Project Path="src/NexCode.Remote/NexCode.Remote.csproj" />
+    <Project Path="src/NexCode.Service/NexCode.Service.csproj" />
+    <Project Path="src/NexCode.Shared/NexCode.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NexCode.Clarify.Tests/NexCode.Clarify.Tests.csproj" />
+    <Project Path="tests/NexCode.Cli.Tests/NexCode.Cli.Tests.csproj" />
+    <Project Path="tests/NexCode.Data.Tests/NexCode.Data.Tests.csproj" />
+    <Project Path="tests/NexCode.Plans.Tests/NexCode.Plans.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,293 @@
+# NexCode Implementation Journal
+
+This journal is append-only. Each slice must record the spec references, intended files, acceptance criteria, verification commands, and final known-good state.
+
+## Slice 0001 — Control Plane Bootstrap
+
+- Status: completed
+- Goal: establish the repo control artifacts and record the first verified environment findings before project scaffolding.
+- Spec references: Sections 38, 39, 40.2, 40.3, 40.5; Phase 0 from the master delivery plan.
+- Affected files:
+  - `AGENTS.md`
+  - `docs/spec-index.md`
+  - `docs/implementation-journal.md`
+  - `docs/architecture-decisions.md`
+- Acceptance criteria:
+  - repo-level execution artifacts exist
+  - spec contradictions are normalized into explicit decisions
+  - environment bootstrap findings are recorded
+- Verification commands:
+  - `dotnet new list winui`
+  - `winget configure -f config.yaml --accept-configuration-agreements --disable-interactivity`
+  - `& 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -all -products * -format json`
+- Notes:
+  - Initial bootstrap run reported success.
+  - `dotnet new list winui` still failed until `dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates` was applied.
+  - Visual Studio Community 2026 is installed at `C:\Program Files\Microsoft Visual Studio\18\Community`.
+- Resume point:
+  - finalize architecture decisions
+  - scaffold solution structure
+
+## Slice 0002 — Solution Scaffold And Foundation Contracts
+
+- Status: completed
+- Goal: replace template placeholders with the first spec-aligned solution foundation across GUI, shared contracts, data, service, and CLI.
+- Spec references: Sections 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 4.2, 4.3, 5.5, 38.
+- Affected files:
+  - `src/NexCode.Gui/*`
+  - `src/NexCode.Service/*`
+  - `src/NexCode.Cli/*`
+  - `src/NexCode.Shared/*`
+  - `src/NexCode.Data/*`
+  - `tests/*`
+- Acceptance criteria:
+  - solution projects reflect the spec's component layout
+  - shared IPC and event contracts exist in `NexCode.Shared`
+  - `NexCode.Data` contains an EF Core + SQLCipher-ready foundation
+  - WinUI shell enforces minimum size and shows a spec-shaped 3-column layout
+  - solution builds successfully
+- Verification commands:
+  - `dotnet restore NexCode.slnx`
+  - `dotnet build NexCode.slnx`
+  - `dotnet test NexCode.slnx --no-build`
+  - `dotnet run --project src/NexCode.Gui/NexCode.Gui.csproj`
+- Notes:
+  - scaffold created with `dotnet new winui-navview`, `worker`, `console`, `grpc`, `classlib`, and `xunit`.
+  - `NexCode.slnx` is the generated solution file format on this SDK, not `NexCode.sln`.
+  - Shared JSON-RPC/session contracts now live in `src/NexCode.Shared`.
+  - `src/NexCode.Data` contains the first EF Core + SQLCipher-ready schema foundation matching the Section 2.3 table list.
+  - `src/NexCode.Service` now exposes a named-pipe helper host that answers `service.health`, `session.create`, and `session.cancel`.
+  - `src/NexCode.Cli` can ping the helper and create a session through the pipe contract.
+  - `src/NexCode.Gui` now provides a 3-column shell, helper status ping surface, and minimum-size enforcement helper.
+  - Restore initially failed because floating package versions pulled EF Core 10; fixed by constraining EF/Data packages to `9.*`.
+  - Runtime verification initially failed because newline-delimited IPC was using indented JSON; fixed by disabling shared pretty-printing.
+  - Packaged GUI verification succeeded after registering the generated loose-layout manifest with `Add-AppxPackage -Register ...\\AppxManifest.xml`.
+- Resume point:
+  - next slice should replace placeholder remote/template content, add CI/docs skeleton, and start wiring auth/account state into service and GUI
+
+## Slice 0003 — Account State, CI Skeleton, And Docs Foundation
+
+- Status: completed
+- Goal: implement the next phase-one foundation slice by wiring account/subscription state through service and GUI, replacing remote template placeholders, and adding CI + legal docs scaffolding.
+- Spec references: Sections 3.1, 3.2, 27, 28, 38.
+- Affected files:
+  - `src/NexCode.Shared/*`
+  - `src/NexCode.Service/*`
+  - `src/NexCode.Cli/*`
+  - `src/NexCode.Gui/*`
+  - `src/NexCode.Remote/*`
+  - `.github/workflows/*`
+  - `docs/*`
+- Acceptance criteria:
+  - helper exposes account and subscription state to GUI/CLI
+  - super-user override is represented in shared/service logic
+  - remote project no longer contains greet-template placeholders
+  - GitHub Actions workflow skeleton exists for CI, release, pages, dependency updates, and CodeQL
+  - docs directory contains the Section 28 legal-document skeleton
+- Verification commands:
+  - `dotnet build NexCode.slnx`
+  - `dotnet test NexCode.slnx --no-build`
+  - helper + CLI account/subscription checks
+  - packaged GUI registration + launch verification
+- Notes:
+  - this slice intentionally focuses on auth/account state plumbing and repo scaffolding, not the full interactive MSAL UI flow yet
+  - `NexCode.Service` now exposes `account.get_snapshot` over named-pipe IPC and applies the super-user override from Section 3.1.2.
+  - Development account seeding is supported through `appsettings.Development.json`; production defaults remain unauthenticated/free unless explicit config or environment input is present.
+  - Runtime verification initially showed the helper ignoring `appsettings*.json` because the content root followed the caller's working directory; fixed by forcing `ContentRootPath = AppContext.BaseDirectory` for service and remote hosts.
+  - `NexCode.Cli` now includes `account status` for helper verification.
+  - `NexCode.Gui` now renders helper, auth, and subscription state in the shell and packaged launch remains verified through loose-layout registration.
+  - `NexCode.Remote` no longer contains the greet template and now exposes a `RemoteControl/GetRemoteHealth` gRPC foundation contract.
+  - `.github/workflows` now contains CI, release, pages, dependency-audit, and CodeQL workflow skeletons.
+  - `docs/` now contains the Section 28 legal/support skeleton and Jekyll configuration.
+- Resume point:
+  - next slice should start the real MSAL interactive flow, subscription cache persistence in `IAPCache`, and initial GitHub Actions script/assets support (`scripts/build`, installer scaffold, OSS license generation)
+
+## Slice 0004 — Durable Auth And Subscription Foundation
+
+- Status: completed
+- Goal: move auth and subscription state from config-only placeholders to a durable service-backed foundation, and add the first Section 27 build-script assets needed for MSIX packaging work.
+- Spec references: Sections 2.3, 3.1, 3.1.1, 3.1.2, 3.2, 3.2.2, 27.2, 27.3, 38.
+- Affected files:
+  - `src/NexCode.Shared/*`
+  - `src/NexCode.Data/*`
+  - `src/NexCode.Service/*`
+  - `src/NexCode.Cli/*`
+  - `src/NexCode.Gui/*`
+  - `tests/*`
+  - `scripts/build/*`
+  - `docs/*`
+- Acceptance criteria:
+  - service resolves account state from a durable local store instead of config-only placeholders
+  - IAP cache entries are persisted in `IAPCache` with verification timestamps and expiry semantics
+  - MSAL configuration and token-cache readiness are exposed explicitly to GUI and CLI consumers
+  - build/packaging script scaffolding exists for MSIX signing and OSS license generation
+- Verification commands:
+  - `dotnet build NexCode.slnx`
+  - `dotnet test NexCode.slnx --no-build`
+  - helper + CLI health/account checks
+  - packaged GUI registration + launch verification
+- Notes:
+  - If verification fails, re-read Sections 3.1 and 3.2 before widening the fix scope.
+  - Keep this slice to durable auth/subscription foundations only; full GUI auth modal and Store purchase UI remain future work.
+- Final notes:
+  - `NexCode.Service` now persists user state and IAP cache through `NexCode.Data.Repositories.AccountRepository` instead of relying only on config placeholders.
+  - MSAL readiness is now explicit in shared payloads: configuration presence, cached-token presence, authentication-required state, and last-authenticated timestamp.
+  - A DPAPI-protected MSAL token cache foundation is in place under `%LocalAppData%\\NexCode\\Auth\\`, and the helper exposes `account.sign_in` for the first interactive sign-in path.
+  - The GUI Account tab now surfaces durable auth/cache state, subscription verification warnings, and a sign-in action that stays disabled until AAD configuration exists.
+  - `scripts/build/Sign-Msix.ps1` and `scripts/build/Generate-OssLicenses.ps1` now back the release workflow and generated `docs/oss-licenses.md`.
+  - Verification failures encountered and fixed inside this slice:
+    - missing `System.Security.Cryptography.ProtectedData` dependency for DPAPI token-cache encryption
+    - SQLite `DateTimeOffset` ordering incompatibility in repository queries
+    - invalid `AddDbContext` + `AddDbContextFactory` lifetime mix that prevented helper startup
+- Verification results:
+  - `dotnet build NexCode.slnx` ✅
+  - `dotnet test NexCode.slnx --no-build` ✅
+  - helper IPC ✅ `service ping`, `account status`, `session create`
+  - interactive sign-in readiness ✅ `account sign-in` fails cleanly with a configuration error when AAD IDs are absent
+  - packaged GUI registration + launch ✅ verified responsive `NexCode` window after `Add-AppxPackage -Register ...\\AppxManifest.xml`
+- Resume point:
+  - next slice should implement the real GUI auth-required modal flow from Section 3.1.1 and move from request/response IPC toward service-emitted auth/session events
+  - after that, implement Windows Store license refresh through `Windows.Services.Store` and replace config-seeded IAP cache updates with actual Store-backed validation
+  - then continue Phase 1 packaging/devops work with installer scaffolding and stronger release-time asset generation
+
+## Slice 0005 — Auth Events, GUI Gate, And Sealed Superuser Grant
+
+- Status: completed
+- Goal: implement the next auth flow slice from Section 3.1.1 by adding service-emitted auth events and a blocking GUI auth gate, while replacing the public superuser email override with a sealed local grant that is not configured through environment variables or checked-in literals.
+- Spec references: Sections 2.2, 3.1, 3.1.1, 3.1.2, 4.3, 5.5, 38; user security requirement on 2026-04-19 for public-repo-safe superuser handling.
+- Affected files:
+  - `NexCode_TechSpec_v1.0.md`
+  - `docs/architecture-decisions.md`
+  - `docs/implementation-journal.md`
+  - `src/NexCode.Shared/*`
+  - `src/NexCode.Service/*`
+  - `src/NexCode.Gui/*`
+  - `src/NexCode.Cli/*`
+  - `tests/*`
+  - `scripts/build/*`
+- Acceptance criteria:
+  - helper emits auth state events through IPC-accessible event polling
+  - GUI shows a blocking auth-required overlay driven by helper auth state/events
+  - public source no longer contains the superuser account identifier or env-var-based superuser activation path
+  - superuser elevation requires a sealed local grant validated cryptographically and protected at rest
+- Verification commands:
+  - `dotnet build NexCode.slnx`
+  - `dotnet test NexCode.slnx --no-build`
+  - helper IPC health/account/event checks
+  - packaged GUI registration + launch verification
+- Notes:
+  - If verification fails, re-read Sections 3.1 and 5.5 before widening the fix scope.
+  - Open-source code cannot prevent a custom local build from removing checks entirely; the goal of this slice is to eliminate supported public configuration paths and move privileged activation into a sealed external grant.
+- Final notes:
+  - `NexCode.Shared` now includes helper event polling contracts and auth event payloads for `auth.required` and `auth.success`.
+  - `NexCode.Service` now publishes auth state changes through `ServiceEventHub`, primes auth state on startup, and exposes `service.poll_events` over named-pipe IPC.
+  - The public hardcoded superuser identifier and `NEXCODE_SUPERUSER` activation path were removed from the live source and replaced with `SuperUserGrantService`, which validates a DPAPI-protected, cryptographically signed local grant file.
+  - `scripts/build/Install-SuperUserGrant.ps1` now installs a privately issued signed grant into the current user's local protected storage without putting the privileged identity in the repository.
+  - `NexCode.Gui` now shows a blocking auth gate overlay above the shell and updates it from both helper snapshots and polled service events.
+  - The spec and architecture decision log were updated so future slices treat the sealed-grant model as the expected design, not the old public literal/email-env model.
+  - Verification failures encountered and fixed inside this slice:
+    - CLI service command parser name conflict after adding event polling
+    - test fixtures still targeting the old account-service constructor and public superuser identifier
+    - one stale no-build test run overlapped a rebuild; reran sequentially to confirm current binaries
+- Verification results:
+  - `dotnet build NexCode.slnx` ✅
+  - `dotnet test NexCode.slnx --no-build` ✅
+  - helper IPC ✅ `service ping`, `service events`, `account status`
+  - helper auth gate behavior ✅ startup emits `auth.required` with reason `msal_configuration_missing`
+  - packaged GUI registration + launch ✅ verified responsive `NexCode` window after `Add-AppxPackage -Register ...\\AppxManifest.xml`
+- Resume point:
+  - next slice should replace auth polling with the broader session/event stream foundation needed for token streaming, checkpoint events, and later plan/todo/clarify live updates
+  - after that, implement real Store-backed license refresh through `Windows.Services.Store` and connect subscription verification warnings to live GUI banners
+  - once AAD client and tenant IDs are available, complete the MSAL interactive experience polish and verify the full unlock flow end to end with the auth gate
+
+## Slice 0006 — Broader Event Stream Foundation
+
+- Status: completed
+- Goal: expand the auth-only polling path into a broader service event foundation that can carry session lifecycle and future token/tool/checkpoint activity, with live surfacing in the shell's Run area.
+- Spec references: Sections 2.2, 4.3, 5.3, 5.5, 10, 11, 13, Appendix E.
+- Affected files:
+  - `docs/implementation-journal.md`
+  - `src/NexCode.Shared/*`
+  - `src/NexCode.Service/*`
+  - `src/NexCode.Cli/*`
+  - `src/NexCode.Gui/*`
+  - `tests/*`
+- Acceptance criteria:
+  - helper event stream supports auth and session lifecycle events through the shared event envelope model
+  - session create/cancel operations emit service events
+  - GUI Run tab shows live event activity from the helper
+  - tests cover shared event serialization and service-side event publication behavior
+- Verification commands:
+  - `dotnet build NexCode.slnx`
+  - `dotnet test NexCode.slnx --no-build`
+  - helper IPC checks for `service ping`, `service events`, `session create`, and `session cancel`
+  - packaged GUI registration + launch verification
+- Notes:
+  - Keep this slice at the event-foundation level; do not pretend the full CLI streaming agent loop exists yet.
+- Final notes:
+  - `NexCode.Shared` now defines a broader service-event envelope set for auth, session lifecycle, token, tool, checkpoint, plan, todo, and clarify event types, while keeping the slice implementation limited to auth and session lifecycle publication.
+  - `NexCode.Service` now emits `session.lifecycle` events for both `session.create` and `session.cancel`, making the helper's event stream useful beyond the auth gate.
+  - `NexCode.Cli` now includes `session cancel --session <guid> [--reason <text>]` alongside the existing session creation and event inspection commands, which made the runtime verification flow fully scriptable.
+  - `NexCode.Gui` now surfaces helper activity in the Run tab and routes auth-gate behavior through `AuthGatePresentationState`, so the sign-in overlay, helper-poll state, and account snapshot status remain consistent during reconnects and transient helper failures.
+  - Targeted tests now cover shared service-event serialization, helper-side publication ordering, and the GUI auth-gate state model.
+  - Sub-agents were used during this slice to parallelize spec-coverage analysis and the GUI state-model work, then their results were integrated into the verified mainline implementation.
+  - Verification failures encountered and fixed inside this slice:
+    - `dotnet build NexCode.slnx` initially failed because a previously running `NexCode.Service` process held `NexCode.Service` output DLLs open; the process was stopped and the same build gate was rerun successfully.
+    - packaged GUI launch initially failed because the `shell:AppsFolder` target was constructed with an invalid doubled backslash; corrected launch now works through the registered package identity.
+- Verification results:
+  - `dotnet build NexCode.slnx` ✅
+  - `dotnet test NexCode.slnx --no-build` ✅
+  - helper IPC ✅ `service ping`, `service events`, `session create`, `session cancel`
+  - helper event stream ✅ baseline auth event observed, then `session.lifecycle` events observed in order for `created` and `cancelled`
+  - packaged GUI registration + launch ✅ verified responsive `NexCode` window after `Add-AppxPackage -Register ...\AppxManifest.xml` and `explorer.exe shell:AppsFolder\<PackageFamilyName>!App`
+- Resume point:
+  - next slice should implement live Store-backed subscription refresh through `Windows.Services.Store` and replace seeded/cache-only IAP updates with real license validation from Sections 3.2.2 and 3.2.3
+  - after that, broaden the same event-stream foundation to carry token/tool/checkpoint events from the future CLI runtime and then plan/todo/clarify updates from Sections 10, 11, and 13
+  - once Store-backed tier refresh exists, connect subscription verification warnings and gated-feature UX to live GUI banners and the future subscription gate surface
+
+## Slice 0007 — Store-Backed Subscription Refresh Foundation
+
+- Status: completed
+- Goal: replace seeded/cache-only subscription state with a real service-owned Microsoft Store license refresh path, while preserving cached fallback and surfacing restore/verification status in the GUI.
+- Spec references: Sections 3.2, 3.2.2, 3.2.3, 3.2.4, 4.3, 5.5, 41.
+- Affected files:
+  - `docs/implementation-journal.md`
+  - `src/NexCode.Shared/*`
+  - `src/NexCode.Service/*`
+  - `src/NexCode.Data/*`
+  - `src/NexCode.Cli/*`
+  - `src/NexCode.Gui/*`
+  - `tests/*`
+- Acceptance criteria:
+  - helper attempts live subscription validation through a dedicated Store refresh path instead of config or environment product seeding
+  - Store refresh persists `IAPCache` with 24-hour expiry semantics and degrades to cached/free with a clear warning when Store validation is unavailable
+  - GUI exposes a restore/refresh purchases action and shows verification-source/warning state from the helper snapshot
+  - CLI can trigger and inspect the same subscription refresh flow for verification
+- Verification commands:
+  - `dotnet build NexCode.slnx`
+  - `dotnet test NexCode.slnx --no-build`
+  - helper + CLI checks for `service ping`, `account status`, and subscription refresh
+  - packaged GUI registration + launch verification
+- Notes:
+  - Keep this slice focused on subscription validation and restore semantics; do not claim the full purchase bottom sheet from Section 3.2.3 yet.
+- Final notes:
+  - `NexCode.Service` is now Windows-targeted so the helper can use `Windows.Services.Store.StoreContext.GetAppLicenseAsync()` through `WindowsStoreSubscriptionService`.
+  - `AccountStateService` no longer seeds subscription state from config or environment product IDs. Instead, it refreshes from Microsoft Store, persists `IAPCache` with a 24-hour lifetime, and falls back to cached/free tier with explicit warnings when Store validation is unavailable.
+  - Legacy cache sources such as earlier `config-seed` entries are now treated as stale and revalidated immediately on the next helper snapshot so the repo no longer relies on development seeding for paid-tier resolution.
+  - `SubscriptionRefreshBackgroundService` now performs the periodic 24-hour refresh expected by Section 3.2.2, while startup refresh still happens through the existing account warmup path.
+  - Shared IPC now includes `account.refresh_subscription`, the CLI exposes `account refresh-subscription`, and the GUI Account tab now offers a `Restore purchases` action backed by the same helper path.
+  - The Account tab now shows subscription source, verification time, expiry time, and helper-provided warnings more explicitly so Store refresh state is visible without opening the database.
+  - Tests now cover Store-refresh response serialization plus both cache-fallback branches in `AccountStateService`.
+  - Verification failures encountered and fixed inside this slice:
+    - the first build failed because the new test fakes instantiated `StoreSubscriptionRefreshResult` incorrectly; corrected the constructor calls and reran the same build gate.
+    - runtime verification initially showed a legacy `config-seed` cache being returned on the first snapshot; the helper now forces a refresh whenever the cache source is not `windows-store`.
+- Verification results:
+  - `dotnet build NexCode.slnx` ✅
+  - `dotnet test NexCode.slnx --no-build` ✅
+  - helper IPC ✅ `service ping`, `account status`, `account refresh-subscription`, `session create`, `session cancel`
+  - Store refresh foundation ✅ helper startup snapshot resolved from `windows-store`; forced refresh returned `Free` with no active add-ons found on this machine
+  - packaged GUI registration + launch ✅ verified responsive `NexCode` window after `Add-AppxPackage -Register ...\AppxManifest.xml` and `explorer.exe shell:AppsFolder\<PackageFamilyName>!App`
+- Resume point:
+  - next slice should use the new Store foundation to implement the first real subscription-gating UX from Section 3.2.3: a GUI restore/status banner path and the start of the subscription gate surface for paid features
+  - after that, broaden the event stream again for token/tool/checkpoint traffic so Sections 5 and 13 move forward on top of the now-stable auth/subscription/helper foundations
+  - once the purchase surface exists, wire explicit feature-tier checks from Section 3.2.4 into session creation limits, sandbox availability, and later sub-agent gating
