@@ -1,6 +1,6 @@
 # NexCode Architecture Decisions
 
-These decisions clarify contradictions or under-specified areas in `NexCode_TechSpec_v1.0.md`. The spec remains authoritative; this file only resolves implementation-critical gaps.
+These decisions clarify contradictions or under-specified areas in `plan.md`. The spec remains authoritative; this file only resolves implementation-critical gaps.
 
 ## AD-0001 — Microsoft Store Products Are Treated As Subscriptions
 

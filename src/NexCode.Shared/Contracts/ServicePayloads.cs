@@ -27,6 +27,14 @@ public sealed record SubscriptionStatePayload(
     string Source,
     string? Warning);
 
+public sealed record SubscriptionCapabilitiesPayload(
+    bool CanUseSandbox,
+    bool CanUseRemoteExecution,
+    bool CanUseCloudExecution,
+    int MaxConcurrentSessions,
+    int MaxSubAgentsPerSession);
+
 public sealed record AccountSnapshotPayload(
     AuthStatePayload Auth,
-    SubscriptionStatePayload Subscription);
+    SubscriptionStatePayload Subscription,
+    SubscriptionCapabilitiesPayload Capabilities);

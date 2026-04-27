@@ -17,6 +17,12 @@ public sealed record SessionSendMessageRequest(
     Guid SessionId,
     string Content);
 
+public sealed record SessionSendMessageResponse(
+    Guid SessionId,
+    Guid UserMessageId,
+    Guid AssistantMessageId,
+    DateTimeOffset AcceptedAt);
+
 public sealed record SessionCancelRequest(
     Guid SessionId,
     string? Reason);

@@ -1,13 +1,18 @@
 using System.Collections.ObjectModel;
+using System.Text;
 using System.Text.Json;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using NexCode.Gui.Auth;
 using NexCode.Gui.Infrastructure;
 using NexCode.Gui.Services;
+using NexCode.Gui.Store;
 using NexCode.Shared.Contracts;
 using NexCode.Shared.Json;
+using NexCode.Shared.Models;
 using Windows.Graphics;
+using WinRT.Interop;
 
 namespace NexCode.Gui;
 
@@ -15,11 +20,21 @@ public sealed partial class MainWindow : Window
 {
     private readonly HelperControlClient _helperControlClient = new();
     private readonly AuthGatePresentationState _authGateState = new();
+    private readonly StorePurchaseService _storePurchaseService = new();
     private readonly WindowSizeConstraintHelper _windowSizeConstraintHelper;
     private readonly CancellationTokenSource _eventPollingCts = new();
     private readonly ObservableCollection<string> _runActivities = [];
+    private readonly ObservableCollection<string> _sessionTranscript = [];
+    private readonly StringBuilder _streamingAssistantBuffer = new();
     private long _lastServiceEventSequence;
     private bool _hasLoadedAccountSnapshot;
+    private bool _isAdjustingTierControlledUi;
+    private bool _turnInProgress;
+    private SubscriptionTier _activeGateRequiredTier = SubscriptionTier.Pro;
+    private string _activeGateFeatureName = "This feature";
+    private AccountSnapshotPayload? _latestAccountSnapshot;
+    private Guid? _activeSessionId;
+    private string _activeSessionDescriptor = "No active session";
 
     public MainWindow()
     {
@@ -31,7 +46,9 @@ public sealed partial class MainWindow : Window
         _windowSizeConstraintHelper = WindowSizeConstraintHelper.Attach(this, 800, 600);
         Closed += MainWindow_Closed;
         RunActivityListView.ItemsSource = _runActivities;
+        SessionTranscriptListView.ItemsSource = _sessionTranscript;
         AddRunActivityLine("Run activity initialized.");
+        UpdateSessionComposerState();
         ApplyAuthGatePresentation();
         _ = RefreshHelperStatusAsync();
         _ = PollServiceEventsAsync(_eventPollingCts.Token);
@@ -84,6 +101,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             HelperProgressRing.IsActive = false;
+            UpdateSessionComposerState();
             ApplyAuthGatePresentation();
         }
     }
@@ -92,6 +110,7 @@ public sealed partial class MainWindow : Window
     {
         var auth = accountSnapshot.Auth;
         var subscription = accountSnapshot.Subscription;
+        var capabilities = accountSnapshot.Capabilities;
         var emailText = string.IsNullOrWhiteSpace(auth.UserEmail) ? "Auth required" : auth.UserEmail;
         var superUserSuffix = auth.IsSuperUser ? " (SuperUser)" : string.Empty;
         var products = subscription.ProductIds.Length == 0
@@ -104,6 +123,7 @@ public sealed partial class MainWindow : Window
                 : emailText;
 
         _hasLoadedAccountSnapshot = true;
+        _latestAccountSnapshot = accountSnapshot;
         AccountStatusTextBlock.Text = $"Auth: {authSummary}{superUserSuffix}";
         SubscriptionStatusTextBlock.Text = $"Tier: {subscription.Tier}";
 
@@ -119,6 +139,8 @@ public sealed partial class MainWindow : Window
         AccountDetailWarningTextBlock.Text = string.IsNullOrWhiteSpace(subscription.Warning)
             ? "Subscription verification: no warnings"
             : $"Subscription verification: {subscription.Warning}";
+        UpdateSubscriptionBanner(accountSnapshot);
+        SyncTierControlledUi(capabilities);
         _authGateState.ApplySnapshot(accountSnapshot, DateTimeOffset.UtcNow);
         ApplyAuthGatePresentation();
     }
@@ -187,6 +209,187 @@ public sealed partial class MainWindow : Window
         {
             ApplyAuthGatePresentation();
         }
+    }
+
+    private async void NewChatButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_latestAccountSnapshot is null)
+        {
+            await RefreshHelperStatusAsync();
+            if (_latestAccountSnapshot is null)
+            {
+                AccountActionStatusTextBlock.Text = "The helper account snapshot is unavailable, so NexCode could not create a session yet.";
+                return;
+            }
+        }
+
+        var request = new SessionCreateRequest(
+            ProjectPath: "C:\\Projects\\NexCode",
+            Mode: GetSelectedSessionMode(),
+            ExecutionMode: GetSelectedExecutionMode(),
+            PermissionLevel: PermissionLevel.Default,
+            SandboxEnabled: SandboxToggleSwitch.IsOn);
+
+        var preflight = SubscriptionCapabilityPolicyForGui.Validate(
+            request,
+            _latestAccountSnapshot.Capabilities,
+            activeSessionsHint: null);
+        if (!preflight.Allowed)
+        {
+            ShowSubscriptionGate(preflight.RequiredTier, preflight.FeatureName, preflight.Message);
+            return;
+        }
+
+        try
+        {
+            var response = await _helperControlClient.CreateSessionAsync(request);
+            ActivateSession(response.SessionId, request);
+            AccountActionStatusTextBlock.Text = $"Session {response.SessionId} created successfully.";
+            RunActivityStatusTextBlock.Text = "A new helper-backed session was created.";
+            AddRunActivityLine($"session.created: {response.SessionId} ({request.Mode}/{request.ExecutionMode}, sandbox={request.SandboxEnabled})");
+            await RefreshHelperStatusAsync();
+        }
+        catch (HelperRequestException ex)
+        {
+            AccountActionStatusTextBlock.Text = ex.Message;
+            RunActivityStatusTextBlock.Text = "The helper rejected the requested session configuration.";
+            if (ex.Code == -32021)
+            {
+                var gate = ResolveGateFromHelperRejection(ex.Message);
+                ShowSubscriptionGate(gate.RequiredTier, gate.FeatureName, ex.Message);
+                return;
+            }
+
+            AddRunActivityLine($"session.create.failed: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            AccountActionStatusTextBlock.Text = $"Session creation failed: {ex.Message}";
+            AddRunActivityLine($"session.create.failed: {ex.Message}");
+        }
+    }
+
+    private async void SendMessageButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeSessionId is null)
+        {
+            SessionTurnStatusTextBlock.Text = "Create a session before sending a message.";
+            return;
+        }
+
+        var content = ComposerTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            SessionTurnStatusTextBlock.Text = "Enter a message before sending it to the helper.";
+            return;
+        }
+
+        ComposerTextBox.Text = string.Empty;
+        AppendSessionTranscriptLine($"You: {content}");
+        SessionTurnStatusTextBlock.Text = "Submitting the message to the helper...";
+        _turnInProgress = true;
+        UpdateSessionComposerState();
+
+        try
+        {
+            var response = await _helperControlClient.SendMessageAsync(
+                new SessionSendMessageRequest(_activeSessionId.Value, content));
+            AddRunActivityLine($"session.message.accepted: {response.SessionId}");
+            SessionTurnStatusTextBlock.Text = "Message accepted. Waiting for streamed helper events...";
+        }
+        catch (Exception ex)
+        {
+            _turnInProgress = false;
+            SessionTurnStatusTextBlock.Text = $"The helper rejected the message: {ex.Message}";
+            AppendSessionTranscriptLine($"System: message send failed - {ex.Message}");
+            UpdateSessionComposerState();
+        }
+    }
+
+    private void ExecutionModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isAdjustingTierControlledUi || _latestAccountSnapshot is null)
+        {
+            return;
+        }
+
+        var mode = GetSelectedExecutionMode();
+        if (mode == ExecutionMode.Local)
+        {
+            return;
+        }
+
+        var capabilities = _latestAccountSnapshot.Capabilities;
+        if (mode == ExecutionMode.Remote && capabilities.CanUseRemoteExecution)
+        {
+            return;
+        }
+
+        if (mode == ExecutionMode.Cloud && capabilities.CanUseCloudExecution)
+        {
+            return;
+        }
+
+        _isAdjustingTierControlledUi = true;
+        ExecutionModeComboBox.SelectedIndex = 0;
+        _isAdjustingTierControlledUi = false;
+
+        if (mode == ExecutionMode.Remote)
+        {
+            ShowSubscriptionGate(SubscriptionTier.Pro, "Remote execution", "Remote execution requires NexCode Pro or higher.");
+        }
+        else
+        {
+            ShowSubscriptionGate(SubscriptionTier.Team, "Cloud execution", "Cloud execution requires NexCode Team or higher.");
+        }
+    }
+
+    private void SandboxToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_isAdjustingTierControlledUi || _latestAccountSnapshot is null)
+        {
+            return;
+        }
+
+        if (!SandboxToggleSwitch.IsOn)
+        {
+            return;
+        }
+
+        if (_latestAccountSnapshot.Capabilities.CanUseSandbox)
+        {
+            return;
+        }
+
+        _isAdjustingTierControlledUi = true;
+        SandboxToggleSwitch.IsOn = false;
+        _isAdjustingTierControlledUi = false;
+        ShowSubscriptionGate(SubscriptionTier.Pro, "Sandbox mode", "Sandbox mode requires NexCode Pro or higher.");
+    }
+
+    private void ShowSubscriptionGateButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowSubscriptionGate(
+            requiredTier: _latestAccountSnapshot?.Subscription.Tier == SubscriptionTier.Free
+                ? SubscriptionTier.Pro
+                : SubscriptionTier.Team,
+            featureName: "Paid NexCode features",
+            detail: "Compare tiers and restore purchases before trying a paid feature again.");
+    }
+
+    private void HideSubscriptionGateButton_Click(object sender, RoutedEventArgs e)
+    {
+        SubscriptionGateSheet.Visibility = Visibility.Collapsed;
+    }
+
+    private async void UpgradeToProButton_Click(object sender, RoutedEventArgs e)
+    {
+        await StartStorePurchaseAsync("nexcode_pro_monthly");
+    }
+
+    private async void UpgradeToTeamButton_Click(object sender, RoutedEventArgs e)
+    {
+        await StartStorePurchaseAsync("nexcode_team_monthly");
     }
 
     private async Task PollServiceEventsAsync(CancellationToken cancellationToken)
@@ -270,6 +473,101 @@ public sealed partial class MainWindow : Window
                     ? $"session.created: {payload.SessionId} ({payload.Mode}/{payload.ExecutionMode})"
                     : $"session.cancelled: {payload.SessionId}";
                 AddRunActivityLine(summary);
+                if (_activeSessionId == payload.SessionId && payload.State.Equals("cancelled", StringComparison.OrdinalIgnoreCase))
+                {
+                    SessionTurnStatusTextBlock.Text = "The active session was cancelled.";
+                    AppendSessionTranscriptLine("System: the active session was cancelled.");
+                    _turnInProgress = false;
+                    UpdateSessionComposerState();
+                }
+                break;
+            }
+            case ServiceEventTypes.SessionStart:
+            {
+                var payload = serviceEvent.Payload.Deserialize<SessionStartEventPayload>(JsonSerialization.Options);
+                if (payload is null || _activeSessionId != payload.SessionId)
+                {
+                    return;
+                }
+
+                _turnInProgress = true;
+                _streamingAssistantBuffer.Clear();
+                StreamingAssistantTextBlock.Text = string.Empty;
+                StreamingAssistantBorder.Visibility = Visibility.Visible;
+                SessionTurnStatusTextBlock.Text = "The helper started streaming a turn.";
+                UpdateSessionComposerState();
+                AddRunActivityLine($"session.start: {payload.SessionId}");
+                break;
+            }
+            case ServiceEventTypes.Status:
+            {
+                var payload = serviceEvent.Payload.Deserialize<StatusEventPayload>(JsonSerialization.Options);
+                if (payload is null)
+                {
+                    return;
+                }
+
+                AddRunActivityLine($"status.{payload.Level}: {payload.Message}");
+                if (_activeSessionId == payload.SessionId)
+                {
+                    SessionTurnStatusTextBlock.Text = payload.Message;
+                }
+                break;
+            }
+            case ServiceEventTypes.Token:
+            {
+                var payload = serviceEvent.Payload.Deserialize<TokenEventPayload>(JsonSerialization.Options);
+                if (payload is null || _activeSessionId != payload.SessionId)
+                {
+                    return;
+                }
+
+                _streamingAssistantBuffer.Append(payload.Content);
+                StreamingAssistantTextBlock.Text = _streamingAssistantBuffer.ToString();
+                StreamingAssistantBorder.Visibility = Visibility.Visible;
+                break;
+            }
+            case ServiceEventTypes.Checkpoint:
+            {
+                var payload = serviceEvent.Payload.Deserialize<CheckpointEventPayload>(JsonSerialization.Options);
+                if (payload is null)
+                {
+                    return;
+                }
+
+                AddRunActivityLine($"checkpoint: {payload.CheckpointId}");
+                if (_activeSessionId == payload.SessionId)
+                {
+                    LatestCheckpointBorder.Visibility = Visibility.Visible;
+                    LatestCheckpointSummaryTextBlock.Text = payload.DiffSummary;
+                    LatestCheckpointFilesTextBlock.Text = payload.FilesChanged.Length == 0
+                        ? "No changed files were recorded for this foundation checkpoint."
+                        : string.Join(Environment.NewLine, payload.FilesChanged.Select(path => $"• {path}"));
+                }
+                break;
+            }
+            case ServiceEventTypes.SessionEnd:
+            {
+                var payload = serviceEvent.Payload.Deserialize<SessionEndEventPayload>(JsonSerialization.Options);
+                if (payload is null || _activeSessionId != payload.SessionId)
+                {
+                    return;
+                }
+
+                if (_streamingAssistantBuffer.Length > 0)
+                {
+                    AppendSessionTranscriptLine($"NexCode: {_streamingAssistantBuffer}");
+                    _streamingAssistantBuffer.Clear();
+                    StreamingAssistantTextBlock.Text = string.Empty;
+                    StreamingAssistantBorder.Visibility = Visibility.Collapsed;
+                }
+
+                _turnInProgress = false;
+                SessionTurnStatusTextBlock.Text = payload.Reason.Equals("completed", StringComparison.OrdinalIgnoreCase)
+                    ? "The helper completed the active turn."
+                    : $"The active turn ended with status: {payload.Reason}";
+                UpdateSessionComposerState();
+                AddRunActivityLine($"session.end: {payload.Reason}");
                 break;
             }
         }
@@ -293,6 +591,122 @@ public sealed partial class MainWindow : Window
         AuthGateOverlay.Visibility = presentation.IsOverlayVisible
             ? Visibility.Visible
             : Visibility.Collapsed;
+        UpdateSessionComposerState();
+    }
+
+    private void UpdateSubscriptionBanner(AccountSnapshotPayload snapshot)
+    {
+        var subscription = snapshot.Subscription;
+        var capabilities = snapshot.Capabilities;
+        var shouldShow = subscription.Tier == SubscriptionTier.Free || !string.IsNullOrWhiteSpace(subscription.Warning);
+
+        SubscriptionBannerBorder.Visibility = shouldShow
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        if (!shouldShow)
+        {
+            return;
+        }
+
+        SubscriptionBannerTitleTextBlock.Text = subscription.Tier == SubscriptionTier.Free
+            ? "Free tier limits are active"
+            : "Subscription verification needs attention";
+        SubscriptionBannerBodyTextBlock.Text = !string.IsNullOrWhiteSpace(subscription.Warning)
+            ? subscription.Warning
+            : $"Your current tier is {subscription.Tier}. This shell currently allows {capabilities.MaxConcurrentSessions} concurrent session(s), sandbox: {(capabilities.CanUseSandbox ? "yes" : "no")}, remote: {(capabilities.CanUseRemoteExecution ? "yes" : "no")}, cloud: {(capabilities.CanUseCloudExecution ? "yes" : "no")}.";
+    }
+
+    private void SyncTierControlledUi(SubscriptionCapabilitiesPayload capabilities)
+    {
+        _isAdjustingTierControlledUi = true;
+
+        if (!capabilities.CanUseSandbox && SandboxToggleSwitch.IsOn)
+        {
+            SandboxToggleSwitch.IsOn = false;
+        }
+
+        var selectedMode = GetSelectedExecutionMode();
+        if (selectedMode == ExecutionMode.Remote && !capabilities.CanUseRemoteExecution)
+        {
+            ExecutionModeComboBox.SelectedIndex = 0;
+        }
+        else if (selectedMode == ExecutionMode.Cloud && !capabilities.CanUseCloudExecution)
+        {
+            ExecutionModeComboBox.SelectedIndex = 0;
+        }
+
+        _isAdjustingTierControlledUi = false;
+    }
+
+    private void ShowSubscriptionGate(SubscriptionTier requiredTier, string featureName, string detail)
+    {
+        _activeGateRequiredTier = requiredTier;
+        _activeGateFeatureName = featureName;
+        SubscriptionGateTitleTextBlock.Text = $"{featureName} requires {requiredTier}";
+        SubscriptionGateBodyTextBlock.Text = detail;
+        SubscriptionGateStatusTextBlock.Text = "Use Restore purchases if you already own a subscription, or start a Microsoft Store purchase from one of the upgrade buttons.";
+        UpgradeToProButton.Visibility = requiredTier == SubscriptionTier.Team
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        UpgradeToTeamButton.Visibility = Visibility.Visible;
+        SubscriptionGateSheet.Visibility = Visibility.Visible;
+        AddRunActivityLine($"subscription.gate: {featureName} requires {requiredTier}");
+    }
+
+    private async Task StartStorePurchaseAsync(string productId)
+    {
+        SubscriptionGateStatusTextBlock.Text = $"Opening Microsoft Store purchase flow for {productId}...";
+
+        try
+        {
+            var hwnd = WindowNative.GetWindowHandle(this);
+            var result = await _storePurchaseService.RequestPurchaseAsync(productId, hwnd);
+            SubscriptionGateStatusTextBlock.Text = result.Message;
+            if (result.ShouldRefreshSubscription)
+            {
+                await RefreshSubscriptionAfterPurchaseAttemptAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            SubscriptionGateStatusTextBlock.Text = $"Microsoft Store purchase failed: {ex.Message}";
+        }
+    }
+
+    private async Task RefreshSubscriptionAfterPurchaseAttemptAsync()
+    {
+        try
+        {
+            var refreshResponse = await _helperControlClient.RefreshSubscriptionAsync();
+            UpdateAccountState(refreshResponse.Snapshot);
+            AccountActionStatusTextBlock.Text = refreshResponse.StatusMessage ?? "Subscription refresh completed.";
+        }
+        catch (Exception ex)
+        {
+            AccountActionStatusTextBlock.Text = $"Subscription refresh after purchase attempt failed: {ex.Message}";
+        }
+    }
+
+    private SessionMode GetSelectedSessionMode()
+    {
+        return ModeComboBox.SelectedIndex switch
+        {
+            1 => SessionMode.Plan,
+            2 => SessionMode.Debug,
+            3 => SessionMode.Ask,
+            _ => SessionMode.Code
+        };
+    }
+
+    private ExecutionMode GetSelectedExecutionMode()
+    {
+        return ExecutionModeComboBox.SelectedIndex switch
+        {
+            1 => ExecutionMode.Remote,
+            2 => ExecutionMode.Cloud,
+            _ => ExecutionMode.Local
+        };
     }
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
@@ -314,6 +728,128 @@ public sealed partial class MainWindow : Window
             }))
         {
             _runActivities.Insert(0, line);
+        }
+    }
+
+    private void ActivateSession(Guid sessionId, SessionCreateRequest request)
+    {
+        _activeSessionId = sessionId;
+        _activeSessionDescriptor = $"{request.Mode} / {request.ExecutionMode} / sandbox {(request.SandboxEnabled ? "on" : "off")}";
+        _turnInProgress = false;
+        _sessionTranscript.Clear();
+        _streamingAssistantBuffer.Clear();
+        StreamingAssistantTextBlock.Text = string.Empty;
+        StreamingAssistantBorder.Visibility = Visibility.Collapsed;
+        LatestCheckpointBorder.Visibility = Visibility.Collapsed;
+        LatestCheckpointSummaryTextBlock.Text = "Checkpoint details will appear here.";
+        LatestCheckpointFilesTextBlock.Text = "No changed files recorded yet.";
+        ActiveSessionSummaryTextBlock.Text = $"Active session {_activeSessionId} · {_activeSessionDescriptor}";
+        SessionTurnStatusTextBlock.Text = "Session created. Send a message to begin the first helper-backed turn.";
+        UpdateSessionComposerState();
+    }
+
+    private void UpdateSessionComposerState()
+    {
+        var authGateVisible = AuthGateOverlay.Visibility == Visibility.Visible;
+        var canCompose = _activeSessionId is not null && !_turnInProgress && !authGateVisible;
+
+        ComposerTextBox.IsEnabled = canCompose;
+        SendMessageButton.IsEnabled = canCompose;
+        StopTurnButton.IsEnabled = false;
+
+        if (_activeSessionId is null)
+        {
+            ActiveSessionSummaryTextBlock.Text = "Create a session to start a helper-backed turn.";
+            if (!_turnInProgress)
+            {
+                SessionTurnStatusTextBlock.Text = "No active session is selected.";
+            }
+        }
+    }
+
+    private void AppendSessionTranscriptLine(string text)
+    {
+        var line = $"{DateTimeOffset.Now:HH:mm:ss}  {text}";
+        if (!DispatcherQueue.TryEnqueue(() =>
+            {
+                _sessionTranscript.Insert(0, line);
+                while (_sessionTranscript.Count > 80)
+                {
+                    _sessionTranscript.RemoveAt(_sessionTranscript.Count - 1);
+                }
+            }))
+        {
+            _sessionTranscript.Insert(0, line);
+        }
+    }
+
+    private (SubscriptionTier RequiredTier, string FeatureName) ResolveGateFromHelperRejection(string message)
+    {
+        if (message.Contains("Cloud execution", StringComparison.OrdinalIgnoreCase))
+        {
+            return (SubscriptionTier.Team, "Cloud execution");
+        }
+
+        if (message.Contains("Remote execution", StringComparison.OrdinalIgnoreCase))
+        {
+            return (SubscriptionTier.Pro, "Remote execution");
+        }
+
+        if (message.Contains("Sandbox mode", StringComparison.OrdinalIgnoreCase))
+        {
+            return (SubscriptionTier.Pro, "Sandbox mode");
+        }
+
+        if (message.Contains("concurrent session", StringComparison.OrdinalIgnoreCase))
+        {
+            var requiredTier = _latestAccountSnapshot?.Capabilities.MaxConcurrentSessions switch
+            {
+                1 => SubscriptionTier.Pro,
+                5 => SubscriptionTier.Team,
+                20 => SubscriptionTier.Enterprise,
+                _ => SubscriptionTier.Enterprise
+            };
+
+            return (requiredTier, "Concurrent sessions");
+        }
+
+        return (SubscriptionTier.Pro, "Paid NexCode feature");
+    }
+
+    private static class SubscriptionCapabilityPolicyForGui
+    {
+        public static (bool Allowed, SubscriptionTier RequiredTier, string FeatureName, string Message) Validate(
+            SessionCreateRequest request,
+            SubscriptionCapabilitiesPayload capabilities,
+            int? activeSessionsHint)
+        {
+            if (request.SandboxEnabled && !capabilities.CanUseSandbox)
+            {
+                return (false, SubscriptionTier.Pro, "Sandbox mode", "Sandbox mode requires NexCode Pro or higher.");
+            }
+
+            if (request.ExecutionMode == ExecutionMode.Remote && !capabilities.CanUseRemoteExecution)
+            {
+                return (false, SubscriptionTier.Pro, "Remote execution", "Remote execution requires NexCode Pro or higher.");
+            }
+
+            if (request.ExecutionMode == ExecutionMode.Cloud && !capabilities.CanUseCloudExecution)
+            {
+                return (false, SubscriptionTier.Team, "Cloud execution", "Cloud execution requires NexCode Team or higher.");
+            }
+
+            if (activeSessionsHint is not null && activeSessionsHint >= capabilities.MaxConcurrentSessions)
+            {
+                return capabilities.MaxConcurrentSessions switch
+                {
+                    1 => (false, SubscriptionTier.Pro, "Concurrent sessions", "Free tier allows only 1 concurrent session."),
+                    5 => (false, SubscriptionTier.Team, "Concurrent sessions", "Pro tier allows up to 5 concurrent sessions."),
+                    20 => (false, SubscriptionTier.Enterprise, "Concurrent sessions", "Team tier allows up to 20 concurrent sessions."),
+                    _ => (false, SubscriptionTier.Enterprise, "Concurrent sessions", "Your current tier has reached its concurrent session limit.")
+                };
+            }
+
+            return (true, SubscriptionTier.Free, string.Empty, string.Empty);
         }
     }
 }

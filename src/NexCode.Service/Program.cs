@@ -2,6 +2,7 @@ using System.Runtime.Versioning;
 using NexCode.Data.Storage;
 using NexCode.Data.Extensions;
 using NexCode.Service.Auth;
+using NexCode.Data.Repositories;
 
 namespace NexCode.Service;
 
@@ -36,6 +37,7 @@ public static class Program
         builder.Services.AddSingleton<SessionRegistry>();
         builder.Services.AddSingleton<ServiceEventHub>();
         builder.Services.AddSingleton<AccountStateService>();
+        builder.Services.AddSingleton<SessionTurnService>();
         builder.Services.AddSingleton<MsalTokenCacheStore>();
         builder.Services.AddSingleton<IMsalAuthService, MsalAuthService>();
         builder.Services.AddSingleton<ISuperUserGrantService, SuperUserGrantService>();

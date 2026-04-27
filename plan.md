@@ -1608,7 +1608,7 @@ This document describes a large, complex system. An AI coder cannot implement al
 
 **Option A — File reference (recommended for tools that support it):**
 ```
-@NexCode_TechSpec_v1.0.md
+@plan.md
 
 Implement [specific section/task].
 ```
@@ -1622,7 +1622,7 @@ Create an `AGENTS.md` in the repo root that summarizes the architecture and poin
 ```markdown
 # NexCode — Agent Context
 
-This is the NexCode agentic coding platform. Full specification: `NexCode_TechSpec_v1.0.md`.
+This is the NexCode agentic coding platform. Full specification: `plan.md`.
 
 Architecture:
 - nexcode-gui: WinUI 3 thin shell (src/NexCode.Gui/)
@@ -1648,7 +1648,7 @@ Use the roadmap in Section 39 as your work order. For each phase, use this promp
 
 ```
 You are implementing NexCode, a WinUI 3 agentic AI coding platform.
-Reference: @NexCode_TechSpec_v1.0.md
+Reference: @plan.md
 
 Current task: [Phase X, specific feature from the roadmap]
 

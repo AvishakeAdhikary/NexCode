@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
         services.AddDbContextFactory<NexCodeDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<NexCodeDatabaseInitializer>();
         services.AddSingleton<IAccountRepository, AccountRepository>();
+        services.AddSingleton<ISessionRepository, SessionRepository>();
         return services;
     }
 }

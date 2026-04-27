@@ -42,7 +42,13 @@ public sealed class ServiceHealthSerializationTests
                 ProductIds: ["sealed-superuser-grant"],
                 IsExpired: false,
                 Source: "sealed-superuser-grant",
-                Warning: null));
+                Warning: null),
+            new SubscriptionCapabilitiesPayload(
+                CanUseSandbox: true,
+                CanUseRemoteExecution: true,
+                CanUseCloudExecution: true,
+                MaxConcurrentSessions: int.MaxValue,
+                MaxSubAgentsPerSession: int.MaxValue));
 
         var json = JsonSerializer.Serialize(payload, JsonSerialization.Options);
 
@@ -106,6 +112,34 @@ public sealed class ServiceHealthSerializationTests
     }
 
     [Fact]
+    public void CheckpointEventSerialization_IncludesDiffSummaryAndFiles()
+    {
+        var payload = new ServiceEventsPollResponse(
+            LatestSequence: 4,
+            Events:
+            [
+                new ServiceEventEnvelope(
+                    Sequence: 4,
+                    EventType: ServiceEventTypes.Checkpoint,
+                    Timestamp: DateTimeOffset.Parse("2026-04-19T00:12:00Z"),
+                    Payload: JsonSerializer.SerializeToElement(
+                        new CheckpointEventPayload(
+                            SessionId: Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                            CheckpointId: Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                            GitCommitHash: null,
+                            DiffSummary: "No file edits were recorded.",
+                            FilesChanged: []),
+                        JsonSerialization.Options))
+            ]);
+
+        var json = JsonSerializer.Serialize(payload, JsonSerialization.Options);
+
+        Assert.Contains("\"eventType\":\"checkpoint\"", json);
+        Assert.Contains("\"diffSummary\":\"No file edits were recorded.\"", json);
+        Assert.Contains("\"filesChanged\":[]", json);
+    }
+
+    [Fact]
     public void SubscriptionRefreshResponseSerialization_IncludesStoreRefreshFlags()
     {
         var payload = new AccountRefreshSubscriptionResponse(
@@ -125,7 +159,13 @@ public sealed class ServiceHealthSerializationTests
                     ProductIds: ["nexcode_pro_monthly"],
                     IsExpired: false,
                     Source: "windows-store",
-                    Warning: null)),
+                    Warning: null),
+                new SubscriptionCapabilitiesPayload(
+                    CanUseSandbox: true,
+                    CanUseRemoteExecution: true,
+                    CanUseCloudExecution: false,
+                    MaxConcurrentSessions: 5,
+                    MaxSubAgentsPerSession: 3)),
             StoreAttempted: true,
             StoreRefreshSucceeded: true,
             UsedCachedFallback: false,

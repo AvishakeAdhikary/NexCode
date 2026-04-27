@@ -1,6 +1,6 @@
 # NexCode Spec Index
 
-This file maps implementation areas to the authoritative sections in `NexCode_TechSpec_v1.0.md` and the planned code ownership.
+This file maps implementation areas to the authoritative sections in `plan.md` and the planned code ownership.
 
 ## Foundation Map
 

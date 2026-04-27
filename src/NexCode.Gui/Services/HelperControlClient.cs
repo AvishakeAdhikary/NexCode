@@ -46,6 +46,26 @@ internal sealed class HelperControlClient
             cancellationToken);
     }
 
+    public Task<SessionCreateResponse> CreateSessionAsync(
+        SessionCreateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return SendRequestAsync<SessionCreateResponse>(
+            IpcMethods.SessionCreate,
+            request,
+            cancellationToken);
+    }
+
+    public Task<SessionSendMessageResponse> SendMessageAsync(
+        SessionSendMessageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return SendRequestAsync<SessionSendMessageResponse>(
+            IpcMethods.SessionSendMessage,
+            request,
+            cancellationToken);
+    }
+
     private static async Task<TPayload> SendRequestAsync<TPayload>(string method, CancellationToken cancellationToken)
     {
         return await SendRequestAsync<TPayload>(method, new { }, cancellationToken);
@@ -79,7 +99,7 @@ internal sealed class HelperControlClient
 
         if (response.Error is not null)
         {
-            throw new InvalidOperationException(response.Error.Message);
+            throw new HelperRequestException(response.Error.Code, response.Error.Message);
         }
 
         return response.DeserializeResult<TPayload>()

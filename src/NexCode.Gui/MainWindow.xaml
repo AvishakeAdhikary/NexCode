@@ -115,7 +115,9 @@
                     </StackPanel>
 
                     <Button
+                        x:Name="NewChatButton"
                         Grid.Row="1"
+                        Click="NewChatButton_Click"
                         HorizontalAlignment="Stretch"
                         Content="New Chat" />
 
@@ -166,54 +168,147 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <ComboBox SelectedIndex="0">
+                        <ComboBox x:Name="ModeComboBox" SelectedIndex="0">
                             <ComboBoxItem Content="Code" />
                             <ComboBoxItem Content="Plan" />
                             <ComboBoxItem Content="Debug" />
                             <ComboBoxItem Content="Ask" />
                         </ComboBox>
-                        <ComboBox Grid.Column="1" SelectedIndex="0">
+                        <ComboBox x:Name="PersonalityComboBox" Grid.Column="1" SelectedIndex="0">
                             <ComboBoxItem Content="Default" />
                             <ComboBoxItem Content="Detailed" />
                             <ComboBoxItem Content="Mentor" />
                         </ComboBox>
-                        <ComboBox Grid.Column="2" SelectedIndex="0">
+                        <ComboBox x:Name="ModelComboBox" Grid.Column="2" SelectedIndex="0">
                             <ComboBoxItem Content="gpt-4.1" />
                             <ComboBoxItem Content="claude-opus-4" />
                             <ComboBoxItem Content="gemini-2.5-pro" />
                         </ComboBox>
-                        <ComboBox Grid.Column="3" SelectedIndex="0">
+                        <ComboBox
+                            x:Name="ExecutionModeComboBox"
+                            Grid.Column="3"
+                            SelectedIndex="0"
+                            SelectionChanged="ExecutionModeComboBox_SelectionChanged">
                             <ComboBoxItem Content="Local" />
                             <ComboBoxItem Content="Remote" />
                             <ComboBoxItem Content="Cloud" />
                         </ComboBox>
-                        <ToggleSwitch Grid.Column="4" Header="Sandbox" />
+                        <ToggleSwitch
+                            x:Name="SandboxToggleSwitch"
+                            Grid.Column="4"
+                            Header="Sandbox"
+                            Toggled="SandboxToggleSwitch_Toggled" />
                     </Grid>
 
-                    <Border
-                        Grid.Row="1"
-                        Padding="12"
-                        Background="{ThemeResource LayerFillColorAltBrush}"
-                        CornerRadius="12">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock FontWeight="SemiBold" Text="Plan/Todo Status" />
-                            <TextBlock Text="No active plan yet" />
-                        </StackPanel>
-                    </Border>
+                    <StackPanel Grid.Row="1" Spacing="10">
+                        <Border
+                            x:Name="SubscriptionBannerBorder"
+                            Padding="12"
+                            Background="{ThemeResource AccentFillColorSecondaryBrush}"
+                            CornerRadius="12"
+                            Visibility="Collapsed">
+                            <StackPanel Spacing="8">
+                                <TextBlock
+                                    x:Name="SubscriptionBannerTitleTextBlock"
+                                    FontWeight="SemiBold"
+                                    Text="Subscription status" />
+                                <TextBlock
+                                    x:Name="SubscriptionBannerBodyTextBlock"
+                                    Text="Subscription details will appear here."
+                                    TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button
+                                        Click="RefreshSubscriptionButton_Click"
+                                        Content="Restore purchases" />
+                                    <Button
+                                        Click="ShowSubscriptionGateButton_Click"
+                                        Content="Compare tiers" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            Padding="12"
+                            Background="{ThemeResource LayerFillColorAltBrush}"
+                            CornerRadius="12">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock FontWeight="SemiBold" Text="Plan/Todo Status" />
+                                <TextBlock Text="No active plan yet" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
 
                     <Border
                         Grid.Row="2"
                         Padding="16"
                         Background="{ThemeResource LayerFillColorAltBrush}"
                         CornerRadius="12">
-                        <StackPanel Spacing="10">
-                            <TextBlock
-                                FontSize="18"
-                                FontWeight="SemiBold"
-                                Text="Session Panel" />
-                            <TextBlock Text="This center column is the phase-one shell for the virtualized message stream, streamed tool output, and plan-aware chat workflow from Sections 4, 5, 10, and 11." TextWrapping="Wrap" />
-                            <TextBlock Text="Next slices will replace this placeholder with the real session feed and IPC-driven state." TextWrapping="Wrap" Opacity="0.72" />
-                        </StackPanel>
+                        <Grid RowSpacing="10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock
+                                    FontSize="18"
+                                    FontWeight="SemiBold"
+                                    Text="Session Panel" />
+                                <TextBlock
+                                    x:Name="ActiveSessionSummaryTextBlock"
+                                    Text="Create a session to start a helper-backed turn."
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Name="SessionTurnStatusTextBlock"
+                                    Opacity="0.72"
+                                    Text="No active session is selected."
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <ListView
+                                x:Name="SessionTranscriptListView"
+                                Grid.Row="1"
+                                SelectionMode="None" />
+
+                            <Border
+                                x:Name="StreamingAssistantBorder"
+                                Grid.Row="2"
+                                Padding="12"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                CornerRadius="12"
+                                Visibility="Collapsed">
+                                <StackPanel Spacing="6">
+                                    <TextBlock FontWeight="SemiBold" Text="Streaming assistant response" />
+                                    <TextBlock
+                                        x:Name="StreamingAssistantTextBlock"
+                                        Text="Assistant tokens will appear here during an active turn."
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border
+                                x:Name="LatestCheckpointBorder"
+                                Grid.Row="3"
+                                Padding="12"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                CornerRadius="12"
+                                Visibility="Collapsed">
+                                <StackPanel Spacing="6">
+                                    <TextBlock FontWeight="SemiBold" Text="Latest checkpoint" />
+                                    <TextBlock
+                                        x:Name="LatestCheckpointSummaryTextBlock"
+                                        Text="Checkpoint details will appear here."
+                                        TextWrapping="Wrap" />
+                                    <TextBlock
+                                        x:Name="LatestCheckpointFilesTextBlock"
+                                        Opacity="0.72"
+                                        Text="No changed files recorded yet."
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
                     </Border>
 
                     <Grid
@@ -224,6 +319,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBox
+                            x:Name="ComposerTextBox"
                             AcceptsReturn="True"
                             MinHeight="88"
                             PlaceholderText="Send a message to NexCode..." />
@@ -231,8 +327,14 @@
                             Grid.Column="1"
                             VerticalAlignment="Bottom"
                             Spacing="8">
-                            <Button Content="Send" />
-                            <Button Content="Stop" />
+                            <Button
+                                x:Name="SendMessageButton"
+                                Click="SendMessageButton_Click"
+                                Content="Send" />
+                            <Button
+                                x:Name="StopTurnButton"
+                                Content="Stop"
+                                IsEnabled="False" />
                         </StackPanel>
                     </Grid>
                 </Grid>
@@ -416,6 +518,118 @@
                     </StackPanel>
                 </Border>
             </Grid>
+        </Border>
+
+        <Border
+            x:Name="SubscriptionGateSheet"
+            Grid.RowSpan="2"
+            Padding="24"
+            VerticalAlignment="Bottom"
+            Background="#66181A1F"
+            Visibility="Collapsed">
+            <Border
+                MaxWidth="960"
+                Padding="24"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                CornerRadius="24">
+                <StackPanel Spacing="16">
+                    <TextBlock
+                        x:Name="SubscriptionGateTitleTextBlock"
+                        FontSize="26"
+                        FontWeight="SemiBold"
+                        Text="Upgrade required" />
+                    <TextBlock
+                        x:Name="SubscriptionGateBodyTextBlock"
+                        Opacity="0.82"
+                        Text="This feature requires a higher NexCode tier."
+                        TextWrapping="Wrap" />
+
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border
+                            Padding="12"
+                            Background="{ThemeResource LayerFillColorAltBrush}"
+                            CornerRadius="12">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontWeight="SemiBold" Text="Free" />
+                                <TextBlock Text="1 concurrent session" TextWrapping="Wrap" />
+                                <TextBlock Text="No sandbox" TextWrapping="Wrap" />
+                                <TextBlock Text="Local execution only" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            Grid.Column="1"
+                            Padding="12"
+                            Background="{ThemeResource LayerFillColorAltBrush}"
+                            CornerRadius="12">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontWeight="SemiBold" Text="Pro" />
+                                <TextBlock Text="5 concurrent sessions" TextWrapping="Wrap" />
+                                <TextBlock Text="Sandbox + remote execution" TextWrapping="Wrap" />
+                                <TextBlock Text="3 sub-agents per session" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            Grid.Column="2"
+                            Padding="12"
+                            Background="{ThemeResource LayerFillColorAltBrush}"
+                            CornerRadius="12">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontWeight="SemiBold" Text="Team" />
+                                <TextBlock Text="20 concurrent sessions" TextWrapping="Wrap" />
+                                <TextBlock Text="Cloud execution included" TextWrapping="Wrap" />
+                                <TextBlock Text="10 sub-agents per session" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            Grid.Column="3"
+                            Padding="12"
+                            Background="{ThemeResource LayerFillColorAltBrush}"
+                            CornerRadius="12">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontWeight="SemiBold" Text="Enterprise" />
+                                <TextBlock Text="Unlimited sessions" TextWrapping="Wrap" />
+                                <TextBlock Text="Unlimited sub-agents" TextWrapping="Wrap" />
+                                <TextBlock Text="All execution modes" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <TextBlock
+                        x:Name="SubscriptionGateStatusTextBlock"
+                        Opacity="0.72"
+                        Text="The GUI will use the packaged Microsoft Store flow here when available."
+                        TextWrapping="Wrap" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button
+                            x:Name="UpgradeToProButton"
+                            Click="UpgradeToProButton_Click"
+                            Content="Upgrade to Pro" />
+                        <Button
+                            x:Name="UpgradeToTeamButton"
+                            Click="UpgradeToTeamButton_Click"
+                            Content="Upgrade to Team" />
+                        <Button
+                            Click="RefreshSubscriptionButton_Click"
+                            Content="Restore purchases" />
+                        <Button
+                            Click="HideSubscriptionGateButton_Click"
+                            Content="Dismiss" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </Border>
     </Grid>
 </Window>

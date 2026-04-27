@@ -1,6 +1,6 @@
 # NexCode — Agent Context
 
-Primary specification: `NexCode_TechSpec_v1.0.md`
+Primary specification: `plan.md`
 
 Execution rules:
 - The spec is the source of truth. Re-read the relevant sections before each implementation slice and after any failed verification.

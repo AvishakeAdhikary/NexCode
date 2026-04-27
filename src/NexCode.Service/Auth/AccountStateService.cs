@@ -29,9 +29,10 @@ public sealed class AccountStateService(
             authResolution.Payload,
             forceStoreRefresh: false,
             cancellationToken);
+        var capabilities = SubscriptionCapabilityPolicy.BuildCapabilities(subscription.Payload.Tier);
         await PersistUserAsync(authResolution, subscription.Payload.Tier, cancellationToken);
         PublishAuthEventIfChanged(authResolution.Payload);
-        return new AccountSnapshotPayload(authResolution.Payload, subscription.Payload);
+        return new AccountSnapshotPayload(authResolution.Payload, subscription.Payload, capabilities);
     }
 
     public async Task<AccountSnapshotPayload> SignInAsync(CancellationToken cancellationToken = default)
@@ -43,9 +44,10 @@ public sealed class AccountStateService(
             authResolution.Payload,
             forceStoreRefresh: false,
             cancellationToken);
+        var capabilities = SubscriptionCapabilityPolicy.BuildCapabilities(subscription.Payload.Tier);
         await PersistUserAsync(authResolution, subscription.Payload.Tier, cancellationToken);
         PublishAuthEventIfChanged(authResolution.Payload);
-        return new AccountSnapshotPayload(authResolution.Payload, subscription.Payload);
+        return new AccountSnapshotPayload(authResolution.Payload, subscription.Payload, capabilities);
     }
 
     public async Task<AccountRefreshSubscriptionResponse> RefreshSubscriptionAsync(
@@ -58,12 +60,13 @@ public sealed class AccountStateService(
             authResolution.Payload,
             forceStoreRefresh: true,
             cancellationToken);
+        var capabilities = SubscriptionCapabilityPolicy.BuildCapabilities(subscription.Payload.Tier);
 
         await PersistUserAsync(authResolution, subscription.Payload.Tier, cancellationToken);
         PublishAuthEventIfChanged(authResolution.Payload);
 
         return new AccountRefreshSubscriptionResponse(
-            Snapshot: new AccountSnapshotPayload(authResolution.Payload, subscription.Payload),
+            Snapshot: new AccountSnapshotPayload(authResolution.Payload, subscription.Payload, capabilities),
             StoreAttempted: subscription.StoreAttempted,
             StoreRefreshSucceeded: subscription.StoreRefreshSucceeded,
             UsedCachedFallback: subscription.UsedCachedFallback,

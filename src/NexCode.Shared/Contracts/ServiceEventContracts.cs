@@ -7,6 +7,9 @@ public static class ServiceEventTypes
     public const string AuthRequired = "auth.required";
     public const string AuthSuccess = "auth.success";
     public const string SessionLifecycle = "session.lifecycle";
+    public const string SessionStart = "session_start";
+    public const string SessionEnd = "session_end";
+    public const string Status = "status";
     public const string Token = "token";
     public const string ToolCall = "tool_call";
     public const string ToolResult = "tool_result";

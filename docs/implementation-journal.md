@@ -156,7 +156,7 @@ This journal is append-only. Each slice must record the spec references, intende
 - Goal: implement the next auth flow slice from Section 3.1.1 by adding service-emitted auth events and a blocking GUI auth gate, while replacing the public superuser email override with a sealed local grant that is not configured through environment variables or checked-in literals.
 - Spec references: Sections 2.2, 3.1, 3.1.1, 3.1.2, 4.3, 5.5, 38; user security requirement on 2026-04-19 for public-repo-safe superuser handling.
 - Affected files:
-  - `NexCode_TechSpec_v1.0.md`
+  - `plan.md`
   - `docs/architecture-decisions.md`
   - `docs/implementation-journal.md`
   - `src/NexCode.Shared/*`
@@ -291,3 +291,96 @@ This journal is append-only. Each slice must record the spec references, intende
   - next slice should use the new Store foundation to implement the first real subscription-gating UX from Section 3.2.3: a GUI restore/status banner path and the start of the subscription gate surface for paid features
   - after that, broaden the event stream again for token/tool/checkpoint traffic so Sections 5 and 13 move forward on top of the now-stable auth/subscription/helper foundations
   - once the purchase surface exists, wire explicit feature-tier checks from Section 3.2.4 into session creation limits, sandbox availability, and later sub-agent gating
+
+## Slice 0008 — Subscription Gate And Tier Enforcement Foundation
+
+- Status: completed
+- Goal: turn the current subscription tier into actual helper-enforced behavior and expose the first GUI subscription-gate surface for paid features.
+- Spec references: Sections 3.2.3, 3.2.4, 4.3, 5.5, 14, 23.
+- Affected files:
+  - `docs/implementation-journal.md`
+  - `src/NexCode.Shared/*`
+  - `src/NexCode.Service/*`
+  - `src/NexCode.Cli/*`
+  - `src/NexCode.Gui/*`
+  - `tests/*`
+- Acceptance criteria:
+  - helper publishes a single subscription-capability model derived from the active tier
+  - session creation enforces the first paid feature gates from Section 3.2.4: concurrent-session limit, sandbox availability, remote execution, and cloud execution
+  - GUI uses helper capabilities to show a subscription banner and a bottom-sheet gate when the user tries a paid feature
+  - GUI can create a local session through helper IPC using the current shell selections
+- Verification commands:
+  - `dotnet build NexCode.slnx`
+  - `dotnet test NexCode.slnx --no-build`
+  - helper + CLI checks for `service ping`, `account status`, and `session create`
+  - packaged GUI registration + launch verification
+- Notes:
+  - Keep this slice to the first enforcement/gating layer. Full purchase completion and broader paid-feature limits remain future work.
+- Final notes:
+  - `NexCode.Shared` now carries a helper-owned `SubscriptionCapabilitiesPayload` inside `AccountSnapshotPayload`, making tier-derived capability decisions explicit instead of implicit in scattered UI checks.
+  - `NexCode.Service.Auth.SubscriptionCapabilityPolicy` now maps Section 3.2.4 tiers into a single capability model and enforces the first paid limits during `session.create`: sandbox, remote execution, cloud execution, and concurrent-session ceilings.
+  - `NexCode.Cli` now supports `session create --execution <local|remote|cloud> [--sandbox]`, which made helper-side tier enforcement directly verifiable without relying only on the GUI.
+  - `NexCode.Gui` now shows a subscription banner, prevents unsupported sandbox/remote/cloud selections, opens a subscription gate sheet for paid features, and can create helper-backed local sessions using the current shell selections.
+  - The Store purchase flow now returns a structured result so the GUI only refreshes subscriptions after `Succeeded` or `AlreadyPurchased`, and it degrades with a user-facing message when Store purchase context is unavailable.
+  - Targeted tests now cover the tier-capability matrix and helper-side session gate rules in addition to the existing shared serialization coverage.
+  - Verification failures encountered and fixed inside this slice:
+    - the first build failed because `MainWindow.xaml.cs` introduced `SelectionChangedEventArgs` without importing `Microsoft.UI.Xaml.Controls`; adding the missing namespace resolved the hard WinUI compile break.
+    - the first build attempt also hit a stale compiler-output lock in `NexCode.Shared`; the lock was cleared by stopping the stale compiler process and rerunning the same build gate.
+    - the first runtime verification accidentally launched an older `net9.0` helper binary, which made the capability payload and tier gates appear missing; verification was restarted against the freshly built `net9.0-windows10.0.17763.0` helper.
+    - the initial GUI helper-rejection path could misclassify any `session.create` failure as a concurrent-session upgrade prompt because it reused the capability limit itself as an active-session hint; the GUI now only opens the subscription gate on the helper's subscription-gate error code and maps the helper message back to the relevant feature.
+- Verification results:
+  - `dotnet build NexCode.slnx` ✅
+  - `dotnet test NexCode.slnx --no-build` ✅
+  - helper IPC ✅ `service ping`, `account status`, `session create --execution remote`, `session create`, `session cancel`
+  - tier enforcement ✅ Free tier now rejects `remote` execution with `-32021`, allows one local session, and rejects a second concurrent local session with the Section 3.2.4 limit message
+  - packaged GUI registration + launch ✅ verified responsive `NexCode` window after `Add-AppxPackage -Register ...\AppxManifest.xml` and `explorer.exe shell:AppsFolder\<PackageFamilyName>!App`
+- Resume point:
+  - next slice should broaden the event stream from Sections 5.3, 5.5, and 13 so the GUI can move from placeholder session content to live token/tool/checkpoint activity
+  - after that, start the first real session-runtime wiring from Section 5: session send-message flow, streamed output events, and persisted message shells in the helper/data layer
+  - once token/tool/checkpoint traffic exists, revisit Section 3.2.3 purchase UX polish so the subscription gate can be triggered from richer feature surfaces instead of only shell-level controls
+
+## Slice 0009 — Session Message Flow And Streamed Turn Events
+
+- Status: completed
+- Goal: implement the first real helper-backed session turn lifecycle so a user message can be sent to an active session, persisted as a message shell, and surfaced in the GUI through streamed token/status/checkpoint events.
+- Spec references: Sections 4.3, 5.3, 5.5, 13.1, 13.2.
+- Affected files:
+  - `docs/implementation-journal.md`
+  - `src/NexCode.Shared/*`
+  - `src/NexCode.Data/*`
+  - `src/NexCode.Service/*`
+  - `src/NexCode.Gui/*`
+  - `tests/*`
+- Acceptance criteria:
+  - helper accepts a session message request for an active session and persists the user/assistant message shell in durable storage
+  - helper emits at least `session_start`, `status`, `token`, `checkpoint`, and `session_end` events for the first simulated turn lifecycle
+  - GUI replaces part of the center-column placeholder with live session activity for the active session
+  - checkpoint cards and streamed assistant text appear from helper events without pretending the full provider/tool loop exists yet
+- Verification commands:
+  - `dotnet build NexCode.slnx`
+  - `dotnet test NexCode.slnx --no-build`
+  - helper + CLI checks for `service ping`, `session create`, `session send-message`, and `service events`
+  - packaged GUI registration + launch verification
+- Notes:
+  - Keep this slice at the first end-to-end turn-flow level only. The provider abstraction, real AI streaming, and tool execution loop remain future slices.
+- Final notes:
+  - `NexCode.Shared` now exposes the first real turn-lifecycle event surface from Section 5.5: `session_start`, `status`, `token`, `checkpoint`, and `session_end`, alongside a concrete `SessionSendMessageResponse`.
+  - `NexCode.Data` now contains a dedicated session repository that persists session creation, user/assistant turn shells, assistant response completion, and checkpoint metadata without introducing schema changes.
+  - `NexCode.Service` now handles `session.send_message`, stores the turn shell immediately, and runs a background `SessionTurnService` that simulates provider streaming while publishing helper events in order and persisting the completed assistant message plus checkpoint artifact.
+  - `NexCode.Cli` now supports `session send-message --session <guid> --content <text>`, which made the new turn lifecycle directly scriptable for verification.
+  - `NexCode.Gui` now replaces the center-column placeholder with an active-session timeline, a streaming assistant surface, a checkpoint card, and a helper-backed send path instead of a static mock shell.
+  - Sub-agents were used again during this slice: one mapped the safest backend extension points and one mapped the smallest safe WinUI replacement seam for the center column, then their findings were folded into the verified implementation.
+  - Verification failures encountered and fixed inside this slice:
+    - the first test run failed because the new turn-service test attempted to `ORDER BY` `DateTimeOffset` in SQLite; the ordering was moved client-side to match the existing repository/testing constraints in this codebase.
+    - the immediate rerun of `dotnet test ... --no-build` still used the stale pre-fix assembly; the solution was rebuilt and the same no-build test gate then passed against current binaries.
+- Verification results:
+  - `dotnet build NexCode.slnx` ✅
+  - `dotnet test NexCode.slnx --no-build` ✅
+  - helper IPC ✅ `service ping`, `session create`, `session send-message`, `service events`, `session cancel`
+  - streamed turn flow ✅ observed ordered `session_start` → `status` → repeated `token` → `checkpoint` → `session_end` events for a real helper-backed session
+  - persistence coverage ✅ tests verify assistant message completion and checkpoint persistence; runtime ack returned concrete user/assistant message IDs and checkpoint ID
+  - packaged GUI registration + launch ✅ verified responsive `NexCode` window after `Add-AppxPackage -Register ...\AppxManifest.xml` and packaged launch
+- Resume point:
+  - next slice should move from the scripted `SessionTurnService` into the first real provider abstraction from Section 5.3 while preserving the same event contracts
+  - after that, add the first true tool event path (`tool_call` / `tool_result`) and richer checkpoint diff metadata so Sections 5 and 13 stop depending on simulated turn content
+  - once real turn execution exists, revisit the session transcript surface to evolve from a lightweight activity timeline into the fuller message/tool artifact stream described in Sections 4.3 and 4.4

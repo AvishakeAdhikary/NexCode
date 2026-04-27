@@ -51,7 +51,13 @@ public sealed class AuthGatePresentationStateTests
                     ProductIds: [],
                     IsExpired: false,
                     Source: "store",
-                    Warning: null)),
+                    Warning: null),
+                new SubscriptionCapabilitiesPayload(
+                    CanUseSandbox: false,
+                    CanUseRemoteExecution: false,
+                    CanUseCloudExecution: false,
+                    MaxConcurrentSessions: 1,
+                    MaxSubAgentsPerSession: 0)),
             DateTimeOffset.Parse("2026-04-19T08:55:30Z"));
 
         state.RecordRefreshFailure("The pipe is busy.");

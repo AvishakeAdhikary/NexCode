@@ -103,13 +103,15 @@ internal static class Program
         if (args[0].Equals("create", StringComparison.OrdinalIgnoreCase))
         {
             var projectPath = GetOption(args, "--project") ?? Environment.CurrentDirectory;
+            var executionMode = ParseExecutionMode(GetOption(args, "--execution"));
+            var sandboxEnabled = HasFlag(args, "--sandbox");
 
             var request = new SessionCreateRequest(
                 ProjectPath: Path.GetFullPath(projectPath),
                 Mode: SessionMode.Code,
-                ExecutionMode: ExecutionMode.Local,
+                ExecutionMode: executionMode,
                 PermissionLevel: PermissionLevel.Default,
-                SandboxEnabled: false);
+                SandboxEnabled: sandboxEnabled);
 
             var response = await SendRequestAsync(
                 JsonRpcRequest.Create(IpcMethods.SessionCreate, request),
@@ -123,6 +125,40 @@ internal static class Program
             }
 
             var payload = response.DeserializeResult<SessionCreateResponse>();
+            Console.WriteLine(JsonSerializer.Serialize(payload, JsonSerialization.Options));
+            return 0;
+        }
+
+        if (args[0].Equals("send-message", StringComparison.OrdinalIgnoreCase))
+        {
+            var sessionIdRaw = GetOption(args, "--session");
+            if (!Guid.TryParse(sessionIdRaw, out var sessionId))
+            {
+                Console.Error.WriteLine("A valid --session <guid> is required.");
+                return 1;
+            }
+
+            var content = GetOption(args, "--content");
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                Console.Error.WriteLine("A non-empty --content <text> value is required.");
+                return 1;
+            }
+
+            var response = await SendRequestAsync(
+                JsonRpcRequest.Create(
+                    IpcMethods.SessionSendMessage,
+                    new SessionSendMessageRequest(sessionId, content)),
+                pipeName,
+                CancellationToken.None);
+
+            if (response.Error is not null)
+            {
+                Console.Error.WriteLine($"{response.Error.Code}: {response.Error.Message}");
+                return 1;
+            }
+
+            var payload = response.DeserializeResult<SessionSendMessageResponse>();
             Console.WriteLine(JsonSerializer.Serialize(payload, JsonSerialization.Options));
             return 0;
         }
@@ -247,6 +283,38 @@ internal static class Program
         return null;
     }
 
+    private static bool HasFlag(IReadOnlyList<string> args, string flagName)
+    {
+        for (var index = 0; index < args.Count; index++)
+        {
+            if (args[index].Equals(flagName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static ExecutionMode ParseExecutionMode(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return ExecutionMode.Local;
+        }
+
+        return rawValue.ToLowerInvariant() switch
+        {
+            "local" => ExecutionMode.Local,
+            "remote" => ExecutionMode.Remote,
+            "cloud" => ExecutionMode.Cloud,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(rawValue),
+                rawValue,
+                "Execution mode must be one of: local, remote, cloud.")
+        };
+    }
+
     private static int UnknownCommand(string command)
     {
         Console.Error.WriteLine($"Unknown command '{command}'.");
@@ -263,7 +331,8 @@ internal static class Program
         Console.WriteLine("  nexcode account status [--pipe <name>]");
         Console.WriteLine("  nexcode account refresh-subscription [--pipe <name>]");
         Console.WriteLine("  nexcode account sign-in [--pipe <name>]");
-        Console.WriteLine("  nexcode session create [--project <path>] [--pipe <name>]");
+        Console.WriteLine("  nexcode session create [--project <path>] [--execution <local|remote|cloud>] [--sandbox] [--pipe <name>]");
+        Console.WriteLine("  nexcode session send-message --session <guid> --content <text> [--pipe <name>]");
         Console.WriteLine("  nexcode session cancel --session <guid> [--reason <text>] [--pipe <name>]");
     }
 }

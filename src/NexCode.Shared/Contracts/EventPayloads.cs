@@ -1,5 +1,21 @@
 namespace NexCode.Shared.Contracts;
 
+public sealed record SessionStartEventPayload(
+    Guid SessionId,
+    string Mode,
+    string Personality,
+    string ProjectPath,
+    bool SandboxEnabled);
+
+public sealed record SessionEndEventPayload(
+    Guid SessionId,
+    string Reason);
+
+public sealed record StatusEventPayload(
+    Guid SessionId,
+    string Message,
+    string Level);
+
 public sealed record TokenEventPayload(
     Guid SessionId,
     string Content);
@@ -18,5 +34,7 @@ public sealed record ToolResultEventPayload(
 
 public sealed record CheckpointEventPayload(
     Guid SessionId,
-    string Summary,
-    string[] ChangedPaths);
+    Guid CheckpointId,
+    string? GitCommitHash,
+    string DiffSummary,
+    string[] FilesChanged);
