@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NexCode.Data.Repositories;
 using NexCode.Data.Storage;
 using NexCode.Service;
+using NexCode.Service.Providers;
+using NexCode.Service.Tools;
 using NexCode.Shared.Contracts;
 using NexCode.Shared.Models;
 
@@ -29,10 +31,12 @@ public sealed class SessionTurnServiceTests
 
             var repository = new SessionRepository(new TestDbContextFactory(options));
             var eventHub = new ServiceEventHub();
+            var responseProvider = new WorkspaceAwareSessionResponseProvider(new SessionToolExecutor());
             var turnService = new SessionTurnService(
                 NullLogger<SessionTurnService>.Instance,
                 eventHub,
-                repository);
+                repository,
+                responseProvider);
 
             var sessionId = Guid.NewGuid();
             var request = new SessionCreateRequest(
@@ -54,6 +58,8 @@ public sealed class SessionTurnServiceTests
             var events = eventHub.Poll(null).Events;
             Assert.Contains(events, item => item.EventType == ServiceEventTypes.SessionStart);
             Assert.Contains(events, item => item.EventType == ServiceEventTypes.Status);
+            Assert.Contains(events, item => item.EventType == ServiceEventTypes.ToolCall);
+            Assert.Contains(events, item => item.EventType == ServiceEventTypes.ToolResult);
             Assert.Contains(events, item => item.EventType == ServiceEventTypes.Token);
             Assert.Contains(events, item => item.EventType == ServiceEventTypes.Checkpoint);
             Assert.Contains(events, item => item.EventType == ServiceEventTypes.SessionEnd);
@@ -72,7 +78,8 @@ public sealed class SessionTurnServiceTests
             Assert.Equal("assistant", messages[1].Role);
             Assert.False(string.IsNullOrWhiteSpace(messages[1].Content));
             Assert.Equal(checkpoint.Id, messages[1].CheckpointId);
-            Assert.Contains("Simulated checkpoint created", checkpoint.DiffSnapshot);
+            Assert.Contains("provider abstraction", messages[1].Content);
+            Assert.Contains("Checkpoint created after the first provider-backed turn", checkpoint.DiffSnapshot);
         }
         finally
         {

@@ -26,6 +26,7 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<string> _runActivities = [];
     private readonly ObservableCollection<string> _sessionTranscript = [];
     private readonly StringBuilder _streamingAssistantBuffer = new();
+    private readonly Dictionary<string, string> _activeToolNamesByCallId = [];
     private long _lastServiceEventSequence;
     private bool _hasLoadedAccountSnapshot;
     private bool _isAdjustingTierControlledUi;
@@ -492,6 +493,7 @@ public sealed partial class MainWindow : Window
 
                 _turnInProgress = true;
                 _streamingAssistantBuffer.Clear();
+                _activeToolNamesByCallId.Clear();
                 StreamingAssistantTextBlock.Text = string.Empty;
                 StreamingAssistantBorder.Visibility = Visibility.Visible;
                 SessionTurnStatusTextBlock.Text = "The helper started streaming a turn.";
@@ -511,6 +513,44 @@ public sealed partial class MainWindow : Window
                 if (_activeSessionId == payload.SessionId)
                 {
                     SessionTurnStatusTextBlock.Text = payload.Message;
+                }
+                break;
+            }
+            case ServiceEventTypes.ToolCall:
+            {
+                var payload = serviceEvent.Payload.Deserialize<ToolCallEventPayload>(JsonSerialization.Options);
+                if (payload is null)
+                {
+                    return;
+                }
+
+                AddRunActivityLine($"tool.call: {payload.ToolName}");
+                if (_activeSessionId == payload.SessionId)
+                {
+                    _activeToolNamesByCallId[payload.CallId] = payload.ToolName;
+                    AppendSessionTranscriptLine($"Tool call: {payload.ToolName} {SummarizeToolArguments(payload.ArgumentsJson)}");
+                    SessionTurnStatusTextBlock.Text = $"Running tool: {payload.ToolName}";
+                }
+                break;
+            }
+            case ServiceEventTypes.ToolResult:
+            {
+                var payload = serviceEvent.Payload.Deserialize<ToolResultEventPayload>(JsonSerialization.Options);
+                if (payload is null)
+                {
+                    return;
+                }
+
+                AddRunActivityLine(payload.IsError
+                    ? $"tool.result.error: {payload.CallId}"
+                    : $"tool.result: {payload.CallId}");
+                if (_activeSessionId == payload.SessionId)
+                {
+                    _activeToolNamesByCallId.TryGetValue(payload.CallId, out var toolName);
+                    AppendSessionTranscriptLine(
+                        payload.IsError
+                            ? $"Tool result ({toolName ?? payload.CallId}): {SummarizeToolResult(payload.ResultJson)}"
+                            : $"Tool result ({toolName ?? payload.CallId}): {SummarizeToolResult(payload.ResultJson)}");
                 }
                 break;
             }
@@ -738,6 +778,7 @@ public sealed partial class MainWindow : Window
         _turnInProgress = false;
         _sessionTranscript.Clear();
         _streamingAssistantBuffer.Clear();
+        _activeToolNamesByCallId.Clear();
         StreamingAssistantTextBlock.Text = string.Empty;
         StreamingAssistantBorder.Visibility = Visibility.Collapsed;
         LatestCheckpointBorder.Visibility = Visibility.Collapsed;
@@ -781,6 +822,67 @@ public sealed partial class MainWindow : Window
         {
             _sessionTranscript.Insert(0, line);
         }
+    }
+
+    private static string SummarizeToolArguments(string argumentsJson)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(argumentsJson);
+            var root = document.RootElement;
+            if (root.TryGetProperty("path", out var pathElement))
+            {
+                var path = pathElement.GetString() ?? "unknown";
+                var maxEntries = root.TryGetProperty("maxEntries", out var maxEntriesElement)
+                    ? maxEntriesElement.GetInt32()
+                    : 0;
+                return $"(path={path}, maxEntries={maxEntries})";
+            }
+        }
+        catch
+        {
+        }
+
+        return string.Empty;
+    }
+
+    private static string SummarizeToolResult(string resultJson)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(resultJson);
+            var root = document.RootElement;
+            if (root.TryGetProperty("warning", out var warningElement)
+                && warningElement.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(warningElement.GetString()))
+            {
+                return warningElement.GetString()!;
+            }
+
+            if (root.TryGetProperty("entryCount", out var entryCountElement))
+            {
+                var entryCount = entryCountElement.GetInt32();
+                var entries = root.TryGetProperty("entries", out var entriesElement)
+                    ? entriesElement.EnumerateArray()
+                        .Take(4)
+                        .Select(item => item.TryGetProperty("name", out var nameElement)
+                            ? nameElement.GetString()
+                            : null)
+                        .Where(item => !string.IsNullOrWhiteSpace(item))
+                        .ToArray()
+                    : [];
+                return entries.Length == 0
+                    ? $"{entryCount} item(s) found."
+                    : $"{entryCount} item(s) found: {string.Join(", ", entries!)}";
+            }
+        }
+        catch
+        {
+        }
+
+        return resultJson.Length <= 120
+            ? resultJson
+            : $"{resultJson[..117]}...";
     }
 
     private (SubscriptionTier RequiredTier, string FeatureName) ResolveGateFromHelperRejection(string message)

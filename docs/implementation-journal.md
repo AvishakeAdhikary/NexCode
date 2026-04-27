@@ -384,3 +384,47 @@ This journal is append-only. Each slice must record the spec references, intende
   - next slice should move from the scripted `SessionTurnService` into the first real provider abstraction from Section 5.3 while preserving the same event contracts
   - after that, add the first true tool event path (`tool_call` / `tool_result`) and richer checkpoint diff metadata so Sections 5 and 13 stop depending on simulated turn content
   - once real turn execution exists, revisit the session transcript surface to evolve from a lightweight activity timeline into the fuller message/tool artifact stream described in Sections 4.3 and 4.4
+
+## Slice 0010 — Provider Abstraction And First Tool Event Path
+
+- Status: completed
+- Goal: replace the hardcoded turn-response builder with the first provider abstraction and emit real `tool_call` / `tool_result` events through the helper turn lifecycle.
+- Spec references: Sections 5.3, 5.4, 5.5, 13.1, 13.2.
+- Affected files:
+  - `docs/implementation-journal.md`
+  - `src/NexCode.Shared/*`
+  - `src/NexCode.Service/*`
+  - `src/NexCode.Gui/*`
+  - `tests/*`
+- Acceptance criteria:
+  - `SessionTurnService` consumes a provider abstraction instead of constructing the full assistant response directly
+  - helper emits at least one real built-in tool lifecycle (`tool_call` and `tool_result`) during a turn
+  - GUI session timeline surfaces tool activity for the active session
+  - existing token/checkpoint/session-end flow still works end to end after the provider/tool refactor
+- Verification commands:
+  - `dotnet build NexCode.slnx`
+  - `dotnet test NexCode.slnx --no-build`
+  - helper + CLI checks for `service ping`, `session create`, `session send-message`, and `service events`
+  - packaged GUI registration + launch verification
+- Notes:
+  - Keep this slice at the provider-abstraction and first built-in-tool level only. Real external AI provider integration remains a later slice.
+- Final notes:
+  - `NexCode.Service` now contains a real provider seam under `src/NexCode.Service/Providers/`, with `ISessionResponseProvider` and `WorkspaceAwareSessionResponseProvider` replacing the old hardcoded response builder inside `SessionTurnService`.
+  - The first real built-in tool path now exists under `src/NexCode.Service/Tools/`: `SessionToolExecutor` executes a guarded `list_directory` operation against the active project root and feeds its JSON result back into the provider-backed turn.
+  - `SessionTurnService` now maps provider updates into the shared event schema, so the helper emits `tool_call` and `tool_result` alongside the existing `session_start`, `status`, `token`, `checkpoint`, and `session_end` lifecycle.
+  - `NexCode.Gui` now surfaces tool activity in the center-column active-session timeline without redesigning the shell: tool calls and results appear as timeline entries while the existing streaming assistant and checkpoint panels continue to carry the higher-level turn flow.
+  - The current provider is still local and deterministic by design, but the turn runtime is no longer a monolithic scripted string builder; the event/persistence path is now shaped to accept a future real external provider.
+  - Sub-agents were used again during this slice to inspect the best backend provider/tool seam and the smallest safe UI seam for tool artifacts. Their findings were integrated, though the root `NexCode_TechSpec_v1.0.md` path was not present in the workspace and this slice therefore anchored itself to the prior verified spec excerpts plus the journaled resume point.
+  - Verification failures encountered and fixed inside this slice:
+    - the first test run failed because the updated turn-service test still expected the older session-turn wording instead of the new provider-abstraction response text; the assertion was narrowed to the real contract and the test gate was rerun.
+    - the initial no-build rerun still depended on the pre-fix compiled test assembly; the solution was rebuilt and the same no-build test gate then passed against current binaries.
+- Verification results:
+  - `dotnet build NexCode.slnx` ✅
+  - `dotnet test NexCode.slnx --no-build` ✅
+  - helper IPC ✅ `service ping`, `session create`, `session send-message`, `service events`, `session cancel`
+  - provider/tool runtime ✅ verified a real turn emits `tool_call`, `tool_result`, `token`, and `checkpoint` events through the helper event stream
+  - packaged GUI registration + launch ✅ verified responsive `NexCode` window after `Add-AppxPackage -Register ...\AppxManifest.xml` and packaged launch
+- Resume point:
+  - next slice should replace `WorkspaceAwareSessionResponseProvider` with the first true external provider adapter while preserving the same provider-update contract
+  - after that, expand the built-in tool layer beyond `list_directory` to the first richer Section 5.4 tools such as `read_file` and `search_files`
+  - once multiple tools and a true provider exist, revisit the center-column timeline so it can evolve from lightweight string entries into richer artifact cards without changing the event transport again

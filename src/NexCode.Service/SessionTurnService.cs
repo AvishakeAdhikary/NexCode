@@ -1,6 +1,6 @@
-using System.Text;
 using Microsoft.Extensions.Logging;
 using NexCode.Data.Repositories;
+using NexCode.Service.Providers;
 using NexCode.Shared.Contracts;
 
 namespace NexCode.Service;
@@ -8,7 +8,8 @@ namespace NexCode.Service;
 public sealed class SessionTurnService(
     ILogger<SessionTurnService> logger,
     ServiceEventHub serviceEventHub,
-    ISessionRepository sessionRepository)
+    ISessionRepository sessionRepository,
+    ISessionResponseProvider responseProvider)
 {
     public void StartTurn(SessionRuntimeState session, Guid assistantMessageId, string userContent)
     {
@@ -20,7 +21,7 @@ public sealed class SessionTurnService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Simulated session turn failed for {SessionId}", session.SessionId);
+                logger.LogError(ex, "Provider-backed session turn failed for {SessionId}", session.SessionId);
                 serviceEventHub.Publish(
                     ServiceEventTypes.Status,
                     new StatusEventPayload(
@@ -54,22 +55,49 @@ public sealed class SessionTurnService(
             ServiceEventTypes.Status,
             new StatusEventPayload(
                 SessionId: session.SessionId,
-                Message: "Building the first helper-backed runtime turn.",
+                Message: "Starting provider-backed helper turn.",
                 Level: "info"));
 
-        var assistantResponse = BuildSimulatedAssistantResponse(session, userContent);
-        var responseBuilder = new StringBuilder(assistantResponse.Length);
-
-        foreach (var chunk in SplitIntoChunks(assistantResponse, 28))
+        var responseBuilder = new System.Text.StringBuilder();
+        await foreach (var update in responseProvider.GenerateTurnAsync(session, userContent, cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            responseBuilder.Append(chunk);
-            serviceEventHub.Publish(
-                ServiceEventTypes.Token,
-                new TokenEventPayload(
-                    SessionId: session.SessionId,
-                    Content: chunk));
-            await Task.Delay(TimeSpan.FromMilliseconds(35), cancellationToken);
+            switch (update)
+            {
+                case ProviderStatusUpdate statusUpdate:
+                    serviceEventHub.Publish(
+                        ServiceEventTypes.Status,
+                        new StatusEventPayload(
+                            SessionId: session.SessionId,
+                            Message: statusUpdate.Message,
+                            Level: statusUpdate.Level));
+                    break;
+                case ProviderToolCallUpdate toolCallUpdate:
+                    serviceEventHub.Publish(
+                        ServiceEventTypes.ToolCall,
+                        new ToolCallEventPayload(
+                            SessionId: session.SessionId,
+                            ToolName: toolCallUpdate.ToolName,
+                            ArgumentsJson: toolCallUpdate.ArgumentsJson,
+                            CallId: toolCallUpdate.CallId));
+                    break;
+                case ProviderToolResultUpdate toolResultUpdate:
+                    serviceEventHub.Publish(
+                        ServiceEventTypes.ToolResult,
+                        new ToolResultEventPayload(
+                            SessionId: session.SessionId,
+                            CallId: toolResultUpdate.CallId,
+                            ResultJson: toolResultUpdate.ResultJson,
+                            IsError: toolResultUpdate.IsError));
+                    break;
+                case ProviderTokenUpdate tokenUpdate:
+                    responseBuilder.Append(tokenUpdate.Content);
+                    serviceEventHub.Publish(
+                        ServiceEventTypes.Token,
+                        new TokenEventPayload(
+                            SessionId: session.SessionId,
+                            Content: tokenUpdate.Content));
+                    break;
+            }
         }
 
         var finalResponse = responseBuilder.ToString();
@@ -82,10 +110,10 @@ public sealed class SessionTurnService(
             ServiceEventTypes.Status,
             new StatusEventPayload(
                 SessionId: session.SessionId,
-                Message: "Creating the simulated checkpoint card for this turn.",
+                Message: "Creating the checkpoint card for this turn.",
                 Level: "info"));
 
-        var diffSummary = "Simulated checkpoint created for the first helper-backed runtime turn. No file edits were recorded in this foundation slice.";
+        var diffSummary = "Checkpoint created after the first provider-backed turn. No file edits were recorded in this foundation slice.";
         var checkpointId = await sessionRepository.CreateCheckpointAsync(
             session.SessionId,
             assistantMessageId,
@@ -113,24 +141,5 @@ public sealed class SessionTurnService(
             new SessionEndEventPayload(
                 SessionId: session.SessionId,
                 Reason: "completed"));
-    }
-
-    private static string BuildSimulatedAssistantResponse(SessionRuntimeState session, string userContent)
-    {
-        var projectName = Path.GetFileName(
-            session.Request.ProjectPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-
-        return $"NexCode received your message for {projectName} in {session.Request.Mode} mode. " +
-               $"This slice is the first helper-backed turn runtime, so the assistant is simulating streamed output while still persisting the user message, assistant response shell, and checkpoint artifact. " +
-               $"Your latest request was: \"{userContent.Trim()}\". " +
-               "The next implementation slices will swap this scripted response for the real provider and tool loop.";
-    }
-
-    private static IEnumerable<string> SplitIntoChunks(string content, int chunkLength)
-    {
-        for (var start = 0; start < content.Length; start += chunkLength)
-        {
-            yield return content.Substring(start, Math.Min(chunkLength, content.Length - start));
-        }
     }
 }
