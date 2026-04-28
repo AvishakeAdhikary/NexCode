@@ -16,3 +16,6 @@ msix-output/
 *.appxbundle
 *.msixbundle
 publish/
+
+# Claude AI files
+.claude/
