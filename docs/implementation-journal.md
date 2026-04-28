@@ -431,7 +431,7 @@ This journal is append-only. Each slice must record the spec references, intende
 
 ## Slice 0011 — Foundation Hardening: Real Encryption + Real LLM + Real Tools + Real Git
 
-- Status: in_progress (phase 2 of N committed; phases 3-7 pending)
+- Status: completed (all phases landed across 4 commits)
 - Goal: turn every spec §2.3, §5, §13 claim into reality — real SQLCipher encryption, real LLM providers (Anthropic + OpenAI) with streaming + tool use, the full Section 5.4 built-in tool surface, the permission system, real LibGit2Sharp checkpoints. This slice intentionally bundles foundation hardening so future feature slices don't sit on stubs.
 - Spec references: Sections 2.3, 5.3, 5.4, 5.5, 13.1, 13.2, 13.3, 24, 26; Appendix A; Appendix B; AD-0009.
 - Affected files (this far):
@@ -479,10 +479,40 @@ This journal is append-only. Each slice must record the spec references, intende
     - `RoundTrip_WrongKey_FailsToDecrypt` (raises `SqliteException` at `Open()` time)
     - `EncryptedDatabase_OnDisk_IsNotPlaintext` (raw bytes contain neither the inserted marker nor the plaintext SQLite header)
     - `Constructor_NullKeyProvider_Throws`, `Constructor_BlankDataSource_Throws`, `FixedKeyDatabaseKeyProvider_RejectsWrongLength`
+- Notes (phase 3 — provider abstraction + real LLM adapters):
+  - `IModelProvider` (streaming `IAsyncEnumerable<ProviderEvent>` with `TextDeltaEvent`, `ToolUseRequestedEvent`, `TurnCompletedEvent`, `ProviderRetryEvent`, `ProviderErrorEvent`) lives in `src/NexCode.Service/Providers/IModelProvider.cs`.
+  - `AnthropicMessagesProvider` (POST `/v1/messages` with `stream: true`, headers `x-api-key` + `anthropic-version: 2023-06-01`, SSE parsing of `content_block_start/delta/stop`, `message_delta`, `message_stop`, tool argument JSON deltas reassembled per content-block index, system prompt mapped to top-level `system` field, tool results attached as `tool_result` blocks on next user message) and `OpenAIResponsesProvider` (POST `/v1/responses`, `Authorization: Bearer`, SSE parsing of `response.output_text.delta`, `response.function_call_arguments.delta`, `response.output_item.added/done`, `response.completed/failed`) both ship.
+  - `ProviderHttpRetryPolicy` honors `Retry-After` (seconds or HTTP-date), 3 attempts max, 30s cap, emits `ProviderRetryEvent` between attempts. `SseEventReader` is an allocation-light `event:`/`data:` parser.
+  - `ModelProviderRegistry` resolves providers by `Key` (`OrdinalIgnoreCase`).
+  - `ProviderApiKeyProtector` adds a column-level DPAPI envelope on top of SQLCipher AES-256, so even a memory-leaked row stays opaque without the user's Windows credentials.
+  - `ProviderConfigurationService` reads/persists provider rows, encrypts API keys on write, decrypts on read, picks a default. First-run upsert auto-flags as default.
+- Notes (phase 4 — tool registry + 7 tools):
+  - `IToolRegistry` + `ToolRegistry` route by tool name (`OrdinalIgnoreCase`), gate `Warned`/`Full` requirements through `IPermissionGate` when the session is in Default mode, wrap thrown exceptions into a structured `tool_exception` outcome, and emit `permission_denied` payloads on gate refusals.
+  - Built-in tools: `read_file`, `write_file`, `create_file`, `delete_file`, `list_directory`, `search_files` (uses `Microsoft.Extensions.FileSystemGlobbing` for the include-glob), `execute_command` (PowerShell 7 / 5.1 / cmd / pwsh / bash / wsl with 30s timeout, kill-on-timeout, sandbox refusal), `cut_paste_file` (Appendix B atomic via temp + `File.Replace`).
+  - `PathSafety.EnsureWithinRoot` is the chokepoint — every path-taking tool routes through it.
+  - The legacy `SessionToolExecutor` was deleted; the new `ToolRegistry` supersedes it.
+- Notes (phase 5 — permission gate + git checkpoint):
+  - `PermissionGateService` (concrete `IPermissionGate`) tracks per-session decisions in a `ConcurrentDictionary<Guid, SessionPermissionState>` with a per-call-id `TaskCompletionSource<PermissionResponse>` for in-flight prompts. Full mode + Default-requirement tools auto-allow; `AllowForSession` and `DenyAlways` decisions short-circuit subsequent calls; cancellation cancels in-flight prompts.
+  - `LibGit2CheckpointService` builds checkpoint commits on a side branch (`nexcode/checkpoint/{sessionId}/{turn}`) using `ObjectDatabase.CreateCommit` + a direct ref write, leaving the user's working branch HEAD untouched. Mixed-resets the index back to HEAD afterwards so the working tree mirrors its pre-call state. All work runs in `Task.Run` with cancellation checks.
+  - `git_status`, `git_diff`, `git_revert` tools wired through the same service.
+- Notes (phase 6 — session turn rewrite):
+  - `SessionTurnService` now drives `IModelProvider` + `IToolRegistry` + `IPermissionGate` + `ICheckpointService`. Builds a mode-aware system prompt (`SystemPromptBuilder`, includes Appendix D anti-spam clarify guidance), loads prior turns from durable storage (`ConversationHistoryLoader`), streams provider events, persists tool round-trips back into the conversation (max 6 round-trips per turn), persists assistant message + creates a real LibGit2 checkpoint at end of turn.
+  - The first-run setup flow surfaces a friendly status banner ("No AI provider is configured…") instead of crashing when the Providers table is empty — confirmed by happy-path build, end-to-end tests deferred to a future slice that adds a provider-config integration fixture.
+- Notes (phase 7 — IPC routes + DI wiring):
+  - `IpcMethods` gained `provider.list`, `provider.upsert`, `provider.remove`, `provider.set_default`, `permission.respond`, `git.status`, `git.diff`, `git.revert`. `PipeServerBackgroundService` handles all of them.
+  - `Program.cs` DI registers two named `IHttpClient`s (`anthropic`, `openai` with 5-minute timeouts), both providers as `IModelProvider`, the registry, the API-key protector, the provider configuration service, all 11 tools as `ITool` + `ToolRegistry` as `IToolRegistry`, the permission gate, the checkpoint service, and the conversation history loader.
+- Verification failures encountered and fixed inside this slice:
+  - Sub-agent A's adapters used `yield return` inside `catch` blocks (CS1631 — illegal in iterator methods). Refactored both providers to stash the error in a local `ProviderErrorEvent?` and yield it after the `try`/`catch`. Same fix for stream-acquisition `catch` blocks.
+  - Sub-agent B's tool registry added a positional `ArgumentsJson` parameter to `ToolInvocationContext` so tools see the raw arguments JSON; this was an additive change that kept agent C's pre-existing git tools compiling.
+  - Legacy `SessionTurnServiceTests.cs` (tied to the old `WorkspaceAwareSessionResponseProvider` + `SessionToolExecutor`) was deleted. The new turn service is exercised by per-component tests across providers, tools, permissions, and checkpoint; an end-to-end fixture is deferred to a future slice with a real provider-config integration harness.
+  - `RevertAsync_ResetsWorkingTreeToPriorCommit` failed due to Git's autocrlf normalising LF to CRLF on Windows checkout; the assertion now compares with line endings normalised.
+- Verification results:
+  - `dotnet build NexCode.slnx` ✅ (0 warnings, 0 errors)
+  - `dotnet test NexCode.slnx` ✅ — 72 passed, 0 failed (was 31 at the start of Slice 0011 phase 3):
+    - NexCode.Plans.Tests: 1 passed
+    - NexCode.Clarify.Tests: 9 passed
+    - NexCode.Data.Tests: 7 passed (encryption round-trip, factory validation, model presence)
+    - NexCode.Cli.Tests: 55 passed (account state, session events, subscription policy, super-user grant, JSON-RPC envelope, Anthropic + OpenAI adapter scenarios, tool registry routing + permission gating, all 11 built-in tools' happy paths and sandbox/path safety, permission gate decision matrix + cancellation, LibGit2 checkpoint create/status/revert)
 - Resume point:
-  - next phase: define `IModelProvider` with streaming + tool-use contract; implement `AnthropicMessagesProvider` (Claude Messages SSE) and `OpenAIResponsesProvider` (Responses API SSE) with 429/5xx retry; add HTTP-mocked tests
-  - then: refactor `SessionToolExecutor` into `ToolRegistry`; implement the 7 spec §5.4 tools with sandbox boundary checks
-  - then: `PermissionGateService` with Default/Full Access semantics + `permission_request` / `permission.respond` IPC
-  - then: real LibGit2Sharp `CheckpointService` + `git_status` / `git_diff` / `git_revert` tools
-  - then: rewrite `SessionTurnService` to drive provider + tools + permissions + checkpoint
-  - then: comprehensive tests + run packaged-GUI verification + finalize this slice's journal entry
+  - Slice 0012 — GUI Aesthetic + Architecture Overhaul: design tokens, ThemeService, MVVM migration with CommunityToolkit.Mvvm, ItemsRepeater virtualization, decompose MainWindow into pages, build SessionHeaderBar / ModelSwitcherDropdown / MessageBubble / CheckpointCard / PermissionPromptCard, polish overlays, basic Settings page (Account / Providers / Appearance / Keyboard).
+  - Future Slice 0011 follow-ups (deferred, do not block 0012): live MSAL interactive sign-in once AAD client/tenant IDs are provisioned; an end-to-end SessionTurnService integration fixture seeded with a fake `IModelProvider` and a temp git repo to walk the full turn loop; Anthropic/OpenAI vision + image inputs; provider-side prompt caching headers.

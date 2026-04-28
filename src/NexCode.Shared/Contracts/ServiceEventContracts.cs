@@ -17,6 +17,9 @@ public static class ServiceEventTypes
     public const string PlanUpdated = "plan.updated";
     public const string TodoUpdated = "todo.updated";
     public const string ClarifyQuestion = "clarify.question";
+    public const string PermissionRequest = "permission_request";
+    public const string ProviderRetry = "provider.retry";
+    public const string ProviderError = "provider.error";
 }
 
 public sealed record ServiceEventsPollRequest(

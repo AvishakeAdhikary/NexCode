@@ -1,7 +1,11 @@
 using System.IO.Pipes;
 using System.Text.Json;
+using System.Runtime.Versioning;
 using Microsoft.Extensions.Options;
 using NexCode.Data.Repositories;
+using NexCode.Service.Git;
+using NexCode.Service.Permissions;
+using NexCode.Service.Providers;
 using NexCode.Shared.Contracts;
 using NexCode.Shared.Ipc;
 using NexCode.Shared.Json;
@@ -9,6 +13,7 @@ using NexCode.Shared.Models;
 
 namespace NexCode.Service;
 
+[SupportedOSPlatform("windows")]
 public sealed class PipeServerBackgroundService(
     ILogger<PipeServerBackgroundService> logger,
     IOptions<ServiceHostOptions> options,
@@ -16,7 +21,10 @@ public sealed class PipeServerBackgroundService(
     ServiceEventHub serviceEventHub,
     SessionRegistry sessionRegistry,
     ISessionRepository sessionRepository,
-    SessionTurnService sessionTurnService) : BackgroundService
+    SessionTurnService sessionTurnService,
+    ProviderConfigurationService providerConfiguration,
+    IPermissionGate permissionGate,
+    ICheckpointService checkpointService) : BackgroundService
 {
     private const int SubscriptionGateRequiredError = -32021;
 
@@ -91,8 +99,168 @@ public sealed class PipeServerBackgroundService(
             IpcMethods.SessionCreate => await HandleSessionCreateAsync(request, cancellationToken),
             IpcMethods.SessionSendMessage => await HandleSessionSendMessageAsync(request, cancellationToken),
             IpcMethods.SessionCancel => HandleSessionCancel(request),
+            IpcMethods.ProviderList => JsonRpcResponse.Success(
+                request.Id,
+                await providerConfiguration.ListAsync(cancellationToken)),
+            IpcMethods.ProviderUpsert => await HandleProviderUpsertAsync(request, cancellationToken),
+            IpcMethods.ProviderRemove => await HandleProviderRemoveAsync(request, cancellationToken),
+            IpcMethods.ProviderSetDefault => await HandleProviderSetDefaultAsync(request, cancellationToken),
+            IpcMethods.PermissionRespond => HandlePermissionRespond(request),
+            IpcMethods.GitStatus => await HandleGitStatusAsync(request, cancellationToken),
+            IpcMethods.GitDiff => await HandleGitDiffAsync(request, cancellationToken),
+            IpcMethods.GitRevert => await HandleGitRevertAsync(request, cancellationToken),
             _ => JsonRpcResponse.Failure(request.Id, -32601, $"Unknown method '{request.Method}'.")
         };
+    }
+
+    private async Task<JsonRpcResponse> HandleProviderUpsertAsync(
+        JsonRpcRequest request,
+        CancellationToken cancellationToken)
+    {
+        var payload = request.DeserializeParams<ProviderUpsertRequest>();
+        if (payload is null || string.IsNullOrWhiteSpace(payload.ProviderKey))
+        {
+            return JsonRpcResponse.Failure(request.Id, -32602, "Invalid provider.upsert payload.");
+        }
+
+        var response = await providerConfiguration.UpsertAsync(payload, cancellationToken);
+        return JsonRpcResponse.Success(request.Id, response);
+    }
+
+    private async Task<JsonRpcResponse> HandleProviderRemoveAsync(
+        JsonRpcRequest request,
+        CancellationToken cancellationToken)
+    {
+        var payload = request.DeserializeParams<ProviderRemoveRequest>();
+        if (payload is null || string.IsNullOrWhiteSpace(payload.ProviderKey))
+        {
+            return JsonRpcResponse.Failure(request.Id, -32602, "Invalid provider.remove payload.");
+        }
+
+        var removed = await providerConfiguration.RemoveAsync(payload.ProviderKey, cancellationToken);
+        return JsonRpcResponse.Success(request.Id, new { providerKey = payload.ProviderKey, removed });
+    }
+
+    private async Task<JsonRpcResponse> HandleProviderSetDefaultAsync(
+        JsonRpcRequest request,
+        CancellationToken cancellationToken)
+    {
+        var payload = request.DeserializeParams<ProviderSetDefaultRequest>();
+        if (payload is null || string.IsNullOrWhiteSpace(payload.ProviderKey))
+        {
+            return JsonRpcResponse.Failure(request.Id, -32602, "Invalid provider.set_default payload.");
+        }
+
+        var ok = await providerConfiguration.SetDefaultAsync(payload.ProviderKey, cancellationToken);
+        return JsonRpcResponse.Success(request.Id, new { providerKey = payload.ProviderKey, isDefault = ok });
+    }
+
+    private JsonRpcResponse HandlePermissionRespond(JsonRpcRequest request)
+    {
+        var payload = request.DeserializeParams<PermissionRespondRequest>();
+        if (payload is null || string.IsNullOrWhiteSpace(payload.CallId) || string.IsNullOrWhiteSpace(payload.Decision))
+        {
+            return JsonRpcResponse.Failure(request.Id, -32602, "Invalid permission.respond payload.");
+        }
+
+        if (!Enum.TryParse<PermissionResponse>(payload.Decision, ignoreCase: true, out var decision))
+        {
+            return JsonRpcResponse.Failure(request.Id, -32602, $"Unknown permission decision '{payload.Decision}'.");
+        }
+
+        permissionGate.Respond(payload.SessionId, payload.CallId, decision);
+        return JsonRpcResponse.Success(
+            request.Id,
+            new PermissionRespondResponse(payload.SessionId, payload.CallId, true));
+    }
+
+    private async Task<JsonRpcResponse> HandleGitStatusAsync(
+        JsonRpcRequest request,
+        CancellationToken cancellationToken)
+    {
+        var payload = request.DeserializeParams<GitStatusRequest>();
+        if (payload is null || string.IsNullOrWhiteSpace(payload.ProjectPath))
+        {
+            return JsonRpcResponse.Failure(request.Id, -32602, "Invalid git.status payload.");
+        }
+
+        var porcelain = await checkpointService.GetStatusAsync(payload.ProjectPath, cancellationToken);
+        var isRepo = !string.IsNullOrEmpty(porcelain) && !porcelain.StartsWith("not_a_repository", StringComparison.Ordinal);
+        var files = ParsePorcelain(porcelain);
+        return JsonRpcResponse.Success(
+            request.Id,
+            new GitStatusResponse(
+                ProjectPath: payload.ProjectPath,
+                IsRepository: isRepo,
+                CurrentBranch: null,
+                HeadCommit: null,
+                Files: files));
+    }
+
+    private async Task<JsonRpcResponse> HandleGitDiffAsync(
+        JsonRpcRequest request,
+        CancellationToken cancellationToken)
+    {
+        var payload = request.DeserializeParams<GitDiffRequest>();
+        if (payload is null || string.IsNullOrWhiteSpace(payload.ProjectPath))
+        {
+            return JsonRpcResponse.Failure(request.Id, -32602, "Invalid git.diff payload.");
+        }
+
+        var diff = await checkpointService.GetDiffAsync(
+            payload.ProjectPath,
+            payload.FromRef ?? "HEAD",
+            payload.ToRef ?? string.Empty,
+            cancellationToken);
+        return JsonRpcResponse.Success(
+            request.Id,
+            new GitDiffResponse(payload.ProjectPath, diff, IsRepository: !string.IsNullOrEmpty(diff)));
+    }
+
+    private async Task<JsonRpcResponse> HandleGitRevertAsync(
+        JsonRpcRequest request,
+        CancellationToken cancellationToken)
+    {
+        var payload = request.DeserializeParams<GitRevertRequest>();
+        if (payload is null
+            || string.IsNullOrWhiteSpace(payload.ProjectPath)
+            || string.IsNullOrWhiteSpace(payload.CheckpointCommitHash))
+        {
+            return JsonRpcResponse.Failure(request.Id, -32602, "Invalid git.revert payload.");
+        }
+
+        var ok = await checkpointService.RevertAsync(
+            payload.ProjectPath,
+            payload.CheckpointCommitHash,
+            cancellationToken);
+        return JsonRpcResponse.Success(
+            request.Id,
+            new GitRevertResponse(payload.ProjectPath, ok, ok ? null : "Checkpoint commit not found or revert failed."));
+    }
+
+    private static GitFileStatus[] ParsePorcelain(string porcelain)
+    {
+        if (string.IsNullOrEmpty(porcelain))
+        {
+            return Array.Empty<GitFileStatus>();
+        }
+
+        var lines = porcelain.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var entries = new List<GitFileStatus>(lines.Length);
+        foreach (var line in lines)
+        {
+            if (line.Length < 4)
+            {
+                continue;
+            }
+
+            var indexState = line[0].ToString();
+            var workingState = line[1].ToString();
+            var path = line[3..].Trim();
+            entries.Add(new GitFileStatus(path, indexState, workingState));
+        }
+
+        return entries.ToArray();
     }
 
     private ServiceEventsPollResponse HandleServicePollEvents(JsonRpcRequest request)

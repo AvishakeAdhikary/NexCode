@@ -2,9 +2,13 @@ using System.Runtime.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using NexCode.Data.Storage;
 using NexCode.Data.Extensions;
-using NexCode.Service.Providers;
-using NexCode.Service.Tools;
 using NexCode.Service.Auth;
+using NexCode.Service.Git;
+using NexCode.Service.Permissions;
+using NexCode.Service.Providers;
+using NexCode.Service.Sessions;
+using NexCode.Service.Tools;
+using NexCode.Service.Tools.Implementations;
 using NexCode.Data.Repositories;
 
 namespace NexCode.Service;
@@ -37,19 +41,59 @@ public static class Program
             builder.Configuration.GetSection(IapOptions.SectionName));
         builder.Services.Configure<SuperUserGrantOptions>(
             builder.Configuration.GetSection(SuperUserGrantOptions.SectionName));
+
+        // Core helper services
         builder.Services.AddSingleton<SessionRegistry>();
         builder.Services.AddSingleton<ServiceEventHub>();
         builder.Services.AddSingleton<AccountStateService>();
         builder.Services.AddSingleton<SessionTurnService>();
-        builder.Services.AddSingleton<SessionToolExecutor>();
-        builder.Services.AddSingleton<ISessionResponseProvider, WorkspaceAwareSessionResponseProvider>();
+
+        // Auth + Store
         builder.Services.AddSingleton<MsalTokenCacheStore>();
         builder.Services.AddSingleton<IMsalAuthService, MsalAuthService>();
         builder.Services.AddSingleton<ISuperUserGrantService, SuperUserGrantService>();
         builder.Services.AddSingleton<IStoreSubscriptionService, WindowsStoreSubscriptionService>();
+
+        // Slice 0011: provider abstraction + real LLM adapters
+        builder.Services.AddHttpClient(AnthropicMessagesProvider.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(5);
+        });
+        builder.Services.AddHttpClient(OpenAIResponsesProvider.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(5);
+        });
+        builder.Services.AddSingleton<IModelProvider, AnthropicMessagesProvider>();
+        builder.Services.AddSingleton<IModelProvider, OpenAIResponsesProvider>();
+        builder.Services.AddSingleton<IModelProviderRegistry, ModelProviderRegistry>();
+        builder.Services.AddSingleton<ProviderApiKeyProtector>();
+        builder.Services.AddSingleton<ProviderConfigurationService>();
+
+        // Slice 0011: tool registry + built-in tools
+        builder.Services.AddSingleton<ITool, ReadFileTool>();
+        builder.Services.AddSingleton<ITool, WriteFileTool>();
+        builder.Services.AddSingleton<ITool, CreateFileTool>();
+        builder.Services.AddSingleton<ITool, DeleteFileTool>();
+        builder.Services.AddSingleton<ITool, ListDirectoryTool>();
+        builder.Services.AddSingleton<ITool, SearchFilesTool>();
+        builder.Services.AddSingleton<ITool, ExecuteCommandTool>();
+        builder.Services.AddSingleton<ITool, CutPasteFileTool>();
+        builder.Services.AddSingleton<ITool, GitStatusTool>();
+        builder.Services.AddSingleton<ITool, GitDiffTool>();
+        builder.Services.AddSingleton<ITool, GitRevertTool>();
+        builder.Services.AddSingleton<IToolRegistry, ToolRegistry>();
+
+        // Slice 0011: permission gate + checkpoint service + session helpers
+        builder.Services.AddSingleton<IPermissionGate, PermissionGateService>();
+        builder.Services.AddSingleton<ICheckpointService, LibGit2CheckpointService>();
+        builder.Services.AddSingleton<ConversationHistoryLoader>();
+
+        // Background services
         builder.Services.AddHostedService<AuthStateWarmupBackgroundService>();
         builder.Services.AddHostedService<SubscriptionRefreshBackgroundService>();
         builder.Services.AddHostedService<PipeServerBackgroundService>();
+
+        // Encrypted data layer
         builder.Services.AddSingleton<IDatabaseKeyProvider>(_ => DpapiDatabaseKeyProvider.FromLocalAppData());
         builder.Services.AddNexCodeData(GetDataSourcePath());
 

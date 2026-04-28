@@ -12,4 +12,14 @@ public static class IpcMethods
     public const string SessionCancel = "session.cancel";
     public const string PlanConfirm = "plan.confirm";
     public const string PlanReject = "plan.reject";
+
+    // Slice 0011 additions
+    public const string ProviderList = "provider.list";
+    public const string ProviderUpsert = "provider.upsert";
+    public const string ProviderRemove = "provider.remove";
+    public const string ProviderSetDefault = "provider.set_default";
+    public const string PermissionRespond = "permission.respond";
+    public const string GitStatus = "git.status";
+    public const string GitDiff = "git.diff";
+    public const string GitRevert = "git.revert";
 }
