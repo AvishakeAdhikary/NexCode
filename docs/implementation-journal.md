@@ -428,3 +428,61 @@ This journal is append-only. Each slice must record the spec references, intende
   - next slice should replace `WorkspaceAwareSessionResponseProvider` with the first true external provider adapter while preserving the same provider-update contract
   - after that, expand the built-in tool layer beyond `list_directory` to the first richer Section 5.4 tools such as `read_file` and `search_files`
   - once multiple tools and a true provider exist, revisit the center-column timeline so it can evolve from lightweight string entries into richer artifact cards without changing the event transport again
+
+## Slice 0011 — Foundation Hardening: Real Encryption + Real LLM + Real Tools + Real Git
+
+- Status: in_progress (phase 2 of N committed; phases 3-7 pending)
+- Goal: turn every spec §2.3, §5, §13 claim into reality — real SQLCipher encryption, real LLM providers (Anthropic + OpenAI) with streaming + tool use, the full Section 5.4 built-in tool surface, the permission system, real LibGit2Sharp checkpoints. This slice intentionally bundles foundation hardening so future feature slices don't sit on stubs.
+- Spec references: Sections 2.3, 5.3, 5.4, 5.5, 13.1, 13.2, 13.3, 24, 26; Appendix A; Appendix B; AD-0009.
+- Affected files (this far):
+  - `plan.md` (inline corrections)
+  - `docs/architecture-decisions.md` (new AD-0009)
+  - `src/NexCode.Data/NexCode.Data.csproj`
+  - `src/NexCode.Data/Storage/IDatabaseKeyProvider.cs`
+  - `src/NexCode.Data/Storage/DpapiDatabaseKeyProvider.cs`
+  - `src/NexCode.Data/Storage/FixedKeyDatabaseKeyProvider.cs`
+  - `src/NexCode.Data/Storage/SqlCipherKeyInterceptor.cs`
+  - `src/NexCode.Data/Storage/EncryptedConnectionFactory.cs`
+  - `src/NexCode.Data/Storage/SqlCipherBootstrapper.cs`
+  - `src/NexCode.Data/Storage/NexCodeDbContextFactory.cs`
+  - `src/NexCode.Data/Extensions/ServiceCollectionExtensions.cs`
+  - `src/NexCode.Service/Program.cs`
+  - `tests/NexCode.Data.Tests/EncryptedConnectionFactoryTests.cs`
+- Acceptance criteria:
+  - **(✅ done)** spec is internally consistent and matches the implementation: TFM, slnx, IAP wording, plugin manifest filename, Store package phantom, §2.3 PRAGMA-key enforcement note, §41-13 packaged-launch step, version-pinning policy, §4.2 sheet sizing
+  - **(✅ done)** AD-0009 codifies that the main-session agent loop runs in `NexCode.Service`, with `NexCode.Cli` reserved as the worker host for sub-agents (Slice 0016) and headless/CI usage
+  - **(✅ done)** every newly opened SQLite connection issues `PRAGMA key` against a 32-byte key derived from a DPAPI-protected salt + PBKDF2-HMAC-SHA256(300_000); database files on disk are no longer plaintext; the wrong key fails fast at `Open()` time
+  - **(⏳ pending)** `IModelProvider` abstraction with streaming + tool use, plus `AnthropicMessagesProvider` and `OpenAIResponsesProvider` with retries on 429/5xx and `Retry-After` honor
+  - **(⏳ pending)** `ProviderConfigurationService` reads encrypted Providers table; first-run setup card forces a provider/key choice before the first turn can be sent
+  - **(⏳ pending)** `ToolRegistry` replaces `SessionToolExecutor`; built-in tools `read_file`, `write_file`, `create_file`, `delete_file`, `search_files`, `execute_command`, `cut_paste_file` (with Appendix B atomic `MoveFileEx`) all real
+  - **(⏳ pending)** `PermissionGateService` issues `permission_request` / consumes `permission.respond` with Default vs Full Access semantics
+  - **(⏳ pending)** `CheckpointService` (LibGit2Sharp) commits to `nexcode/checkpoint/<session>/<turn>`, captures unified diff, persists `Checkpoints` row, supports revert; `git_status`, `git_diff`, `git_revert` tools wired
+  - **(⏳ pending)** `SessionTurnService` rewritten to drive `IModelProvider` + `ToolRegistry` + permission gate + checkpoint
+  - **(⏳ pending)** comprehensive tests across all phases above
+- Verification commands (per phase):
+  - `dotnet build NexCode.slnx`
+  - `dotnet test NexCode.slnx --no-build`
+  - helper IPC smoke
+  - packaged GUI registration + launch
+- Notes (phase 2 — encryption foundation):
+  - The journal-claim that NexCode persisted encrypted data was false prior to this phase: `SqlCipherBootstrapper.EnsureInitialized()` only called `SQLitePCL.Batteries_V2.Init()` and never issued `PRAGMA key`. The legacy `SQLitePCLRaw.bundle_sqlcipher` 1.1.14 also bound to an old `ISQLite3Provider` surface that's incompatible with `SQLitePCLRaw.core` 2.x carried by EF Core 9.
+  - Switched to `Microsoft.Data.Sqlite.Core` + `Microsoft.EntityFrameworkCore.Sqlite.Core` + `SQLitePCLRaw.bundle_e_sqlcipher` 2.x so the SQLCipher provider actually wins. Default e_sqlite3 transitive dep is no longer pulled in.
+  - `PRAGMA cipher_compatibility = 4` must precede `PRAGMA key` — once the key has been processed for a connection, cipher settings are locked.
+  - Forced `SELECT count(*) FROM sqlite_master` inside `ApplyKey` so an incorrect key fails synchronously at `Open()`, instead of the test surfacing later through silent decrypt-as-garbage.
+  - Used a `[ModuleInitializer]` (CA2255 suppressed locally) to register the SQLCipher provider before any `Microsoft.Data.Sqlite.SqliteConnection` static constructor runs. Without that, tests that construct `NexCodeDbContext` directly (skipping `AddNexCodeData`) crashed during `Batteries_V2.Init()`.
+  - `EncryptedConnectionFactory` exposes the same keying for raw `SqliteConnection` use cases so future migrations / ad-hoc paths can't bypass encryption either.
+  - Existing tests that build a `DbContextOptionsBuilder<NexCodeDbContext>` directly and pass a bare `Data Source=…` connection string still work — they're unencrypted, but they're unit tests of unrelated services that don't write secrets. The runtime DI path (`AddNexCodeData`) is keyed; the design-time `IDesignTimeDbContextFactory` uses a fixed key against a transient design-time database so `dotnet ef` never touches the user's encrypted db.
+- Verification results so far:
+  - `dotnet build NexCode.slnx` ✅ (0 warnings, 0 errors after `CA2255` suppression on the `ModuleInitializer`)
+  - `dotnet test NexCode.slnx --no-build` ✅ — 31 passed (gained 6 new encryption round-trip tests in `NexCode.Data.Tests`):
+    - `RoundTrip_CorrectKey_DecryptsExistingDatabase`
+    - `RoundTrip_WrongKey_FailsToDecrypt` (raises `SqliteException` at `Open()` time)
+    - `EncryptedDatabase_OnDisk_IsNotPlaintext` (raw bytes contain neither the inserted marker nor the plaintext SQLite header)
+    - `Constructor_NullKeyProvider_Throws`, `Constructor_BlankDataSource_Throws`, `FixedKeyDatabaseKeyProvider_RejectsWrongLength`
+- Resume point:
+  - next phase: define `IModelProvider` with streaming + tool-use contract; implement `AnthropicMessagesProvider` (Claude Messages SSE) and `OpenAIResponsesProvider` (Responses API SSE) with 429/5xx retry; add HTTP-mocked tests
+  - then: refactor `SessionToolExecutor` into `ToolRegistry`; implement the 7 spec §5.4 tools with sandbox boundary checks
+  - then: `PermissionGateService` with Default/Full Access semantics + `permission_request` / `permission.respond` IPC
+  - then: real LibGit2Sharp `CheckpointService` + `git_status` / `git_diff` / `git_revert` tools
+  - then: rewrite `SessionTurnService` to drive provider + tools + permissions + checkpoint
+  - then: comprehensive tests + run packaged-GUI verification + finalize this slice's journal entry
