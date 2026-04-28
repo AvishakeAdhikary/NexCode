@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using Microsoft.Extensions.DependencyInjection;
 using NexCode.Data.Storage;
 using NexCode.Data.Extensions;
 using NexCode.Service.Providers;
@@ -49,7 +50,8 @@ public static class Program
         builder.Services.AddHostedService<AuthStateWarmupBackgroundService>();
         builder.Services.AddHostedService<SubscriptionRefreshBackgroundService>();
         builder.Services.AddHostedService<PipeServerBackgroundService>();
-        builder.Services.AddNexCodeData(GetConnectionString());
+        builder.Services.AddSingleton<IDatabaseKeyProvider>(_ => DpapiDatabaseKeyProvider.FromLocalAppData());
+        builder.Services.AddNexCodeData(GetDataSourcePath());
 
         var host = builder.Build();
         await using var scope = host.Services.CreateAsyncScope();
@@ -58,7 +60,7 @@ public static class Program
         await host.RunAsync();
     }
 
-    private static string GetConnectionString()
+    private static string GetDataSourcePath()
     {
         var dataRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -66,7 +68,7 @@ public static class Program
             "Data");
 
         Directory.CreateDirectory(dataRoot);
-        return $"Data Source={Path.Combine(dataRoot, "nexcode.db")}";
+        return Path.Combine(dataRoot, "nexcode.db");
     }
 
     private static string? FirstNonEmpty(string? preferred, string? fallback)

@@ -9,14 +9,26 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.*" />
+    <!--
+      Microsoft.Data.Sqlite.Core (not Microsoft.Data.Sqlite) is used so the SQLCipher native
+      provider wins. The full Microsoft.Data.Sqlite package transitively pulls in
+      SQLitePCLRaw.bundle_e_sqlite3 which would shadow SQLCipher and silently disable
+      encryption. EF Core's SQLite provider follows the same split.
+    -->
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="9.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.*">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.*" />
-    <PackageReference Include="SQLitePCLRaw.bundle_sqlcipher" Version="*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite.Core" Version="9.*" />
+    <!--
+      bundle_e_sqlcipher 2.x is the modern open-source SQLCipher-compatible bundle aligned
+      with SQLitePCLRaw.core 2.x. The legacy bundle_sqlcipher 1.1.14 binds to the old
+      ISQLite3Provider surface and crashes Microsoft.Data.Sqlite 9.x at init time.
+    -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlcipher" Version="2.*" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.*" />
   </ItemGroup>
 
 </Project>
