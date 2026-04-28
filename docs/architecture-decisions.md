@@ -49,3 +49,12 @@ These decisions clarify contradictions or under-specified areas in `plan.md`. Th
 - Spec references: Section 3.1.2, Section 2.3, Section 35; user security requirement on 2026-04-19.
 - Decision: replace the public hardcoded superuser identifier and env-var activation path with a sealed local grant stored outside the repository, protected at rest with DPAPI, and validated cryptographically by the helper service.
 - Reason: the repository is intended to be public, so the privileged account mapping must not be exposed as a checked-in literal or a supported environment-variable switch.
+
+## AD-0009 — Agent Loop Hosted In `NexCode.Service`; CLI Reserved For Sub-Agents And Headless Use
+
+- Spec references: Sections 2.1.1, 2.1.3, 5.1, 5.3, 19.
+- Decision: the main-session agent loop (LLM provider streaming, tool execution, checkpoint emission, plan/todo/clarify management) runs in-process inside `NexCode.Service`. `NexCode.Cli` is **not** spawned per main session. `NexCode.Cli` is reserved as the worker host for two cases:
+  - Sub-agents spawned via `spawn_subagent` (Section 19), where each sub-agent runs in its own `NexCode.Cli` child process for permission and sandbox isolation.
+  - Headless / CI / scripted usage where the user invokes `nexcode` directly from a terminal without the GUI.
+- Reason: §2.1.3 reads as if the helper *must* spawn one CLI worker per active session, but spawning a child process for every chat turn is unnecessary process churn and complicates IPC, streaming, and crash recovery. Running the main session inside the helper keeps the hot path simple, lets the existing `ServiceEventHub` carry token/tool/checkpoint events without an extra hop, and still gives sub-agents real OS-level isolation when they actually need it. The CLI surface stays useful as a thin JSON-RPC client today and grows into a proper worker host when sub-agents land in Slice 0016.
+- Implication: Section 5 of `plan.md` should be read as "the agent loop runs in the helper for the main session, and in a CLI worker process for sub-agents", not "always in a CLI worker". Future spec revisions should fold this into §2.1 rather than treating it as an exception.

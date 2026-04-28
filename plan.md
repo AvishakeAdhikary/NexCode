@@ -153,6 +153,10 @@ NexCode uses **SQLite 3.46+** accessed through `Microsoft.Data.Sqlite` (the offi
 3. Derive final 32-byte SQLCipher key: `key = PBKDF2(dpapi_key, db_salt, 300000, 32, SHA256)`.
 4. Pass to SQLCipher via `PRAGMA key = '<hex_key>';` on every connection open. Key is never written to disk.
 
+#### Encryption Enforcement (non-bypassable)
+
+All `DbContext` instances **must** open their `SqliteConnection` through `EncryptedConnectionFactory`, which subscribes to `SqliteConnection.StateChange` and issues `PRAGMA key = "x'<hex>'";` (followed by `PRAGMA cipher_compatibility = 4;`) on the *first* `Open` of every connection. Construction paths that bypass the factory (e.g., raw `new SqliteConnection("Data Source=...")`) are forbidden by code review and must throw on access via `NexCode.Data.Storage.PlaintextConnectionGuard`. This rule exists because an early scaffold of the data layer initialized the SQLCipher binding (`SQLitePCL.Batteries_V2.Init()`) without ever issuing `PRAGMA key`, leaving the database plaintext on disk despite the encrypted-by-default claim. Treat encryption as a non-optional invariant of the storage layer, not as a future task.
+
 #### Core Database Tables
 
 | Table | Purpose |
@@ -226,12 +230,14 @@ The following Store add-on products are registered in Partner Center:
 
 | Product ID | Type | Description |
 |---|---|---|
-| `nexcode_pro_monthly` | Durable (renewable subscription) | NexCode Pro — Monthly |
-| `nexcode_pro_annual` | Durable (renewable subscription) | NexCode Pro — Annual |
-| `nexcode_team_monthly` | Durable (renewable subscription) | NexCode Team — Monthly |
-| `nexcode_team_annual` | Durable (renewable subscription) | NexCode Team — Annual |
-| `nexcode_enterprise_monthly` | Durable (renewable subscription) | NexCode Enterprise — Monthly |
-| `nexcode_enterprise_annual` | Durable (renewable subscription) | NexCode Enterprise — Annual |
+| `nexcode_pro_monthly` | Subscription (renewable) | NexCode Pro — Monthly |
+| `nexcode_pro_annual` | Subscription (renewable) | NexCode Pro — Annual |
+| `nexcode_team_monthly` | Subscription (renewable) | NexCode Team — Monthly |
+| `nexcode_team_annual` | Subscription (renewable) | NexCode Team — Annual |
+| `nexcode_enterprise_monthly` | Subscription (renewable) | NexCode Enterprise — Monthly |
+| `nexcode_enterprise_annual` | Subscription (renewable) | NexCode Enterprise — Annual |
+
+> **Add-on type:** create these in Partner Center as **"Subscription"** add-ons, not "Durable". Subscription add-ons cover renewable billing with native Store-managed lifecycle (renew/cancel/grace-period). This matches §41 Step 5 and the AD-0001 architecture decision.
 
 > **Note:** Microsoft Store subscription add-ons require that your app's Store listing is published and the add-ons are configured in Partner Center before they can be purchased. See Section 41 for the step-by-step manual setup.
 
@@ -287,11 +293,13 @@ When a user tries to use a feature gated behind a higher tier, a **Subscription 
 ### 4.1 Technology Stack (Latest Stable Versions)
 
 > **Policy: all packages use "Latest stable NuGet/SDK" at time of development. No hardcoded version numbers in this spec — always target the latest GA release.**
+>
+> **Reproducibility:** the solution uses Central Package Management (`Directory.Packages.props`). Pin major+minor and allow patch floats only (e.g., `9.0.*`). This prevents repeats of the Slice 0002 incident where unpinned EF Core floated to a major-version-incompatible release.
 
 | Component | Library / Package | Notes |
 |---|---|---|
 | UI Framework | WinUI 3 via Windows App SDK | Latest stable GA |
-| Language | C# 13 / .NET 9 | Target `net9.0-windows10.0.22621.0` |
+| Language | C# 13 / .NET 9 | GUI targets `net9.0-windows10.0.26100.0`; Service/Remote target `net9.0-windows10.0.17763.0` so the helper can consume `Windows.Services.Store` WinRT on the broadest supported Windows |
 | MVVM | CommunityToolkit.Mvvm | Latest stable NuGet |
 | DI | Microsoft.Extensions.DependencyInjection | Aligned with .NET 9 |
 | Virtualized Lists | WinUI ItemsRepeater + IncrementalLoadingCollection | Included in Windows App SDK |
@@ -299,7 +307,7 @@ When a user tries to use a feature gated behind a higher tier, a **Subscription 
 | Terminal | VtNetCore + ConPTY (Win32 P/Invoke) | Latest VtNetCore NuGet |
 | Code Editor | Monaco Editor (latest, WebView2 hosted) | Bundled locally — no CDN required |
 | Auth | Microsoft.Identity.Client (MSAL) | Latest stable NuGet |
-| IAP | Windows.Services.Store (WinRT) | Inbox Windows App SDK |
+| IAP | `Windows.Services.Store` WinRT namespace | Reachable directly from a `net9.0-windows10.0.x` TFM via the Windows App SDK; no separate NuGet package required |
 | IPC | System.IO.Pipes (named pipe) | Inbox .NET 9 |
 | Database | Microsoft.Data.Sqlite + SQLCipher | `SQLitePCLRaw.bundle_sqlcipher` latest |
 | ORM | Microsoft.EntityFrameworkCore.Sqlite | Latest stable NuGet |
@@ -315,17 +323,17 @@ When a user tries to use a feature gated behind a higher tier, a **Subscription 
 
 ### 4.2 Window Size Constraints
 
-All windows enforce a minimum size set in the constructor via `AppWindow.MinSize`:
+Top-level windows (`AppWindow`) enforce a minimum size set in the constructor via `AppWindow.MinSize`. In-window surfaces (sheets, overlays, popups) are **content-sized within the host window** — they don't get their own `AppWindow.MinSize`, but their content layout asserts the minima below to keep their controls usable.
 
-| Window | Minimum Size |
-|---|---|
-| Main dashboard | 800 × 600 px |
-| Detached editor | 800 × 600 px |
-| Settings dialog | 700 × 500 px |
-| Mode editor sheet | 640 × 480 px |
-| Terminal window (detached) | 600 × 400 px |
-| Plan/Todo sheet | 640 × 480 px |
-| Clarify Question overlay | 520 × 320 px |
+| Surface | Type | Minimum Size |
+|---|---|---|
+| Main dashboard | `AppWindow` | 800 × 600 px |
+| Detached editor | `AppWindow` | 800 × 600 px |
+| Terminal window (detached) | `AppWindow` | 600 × 400 px |
+| Settings dialog | in-window page | 700 × 500 px (host can be smaller; settings reflows) |
+| Mode editor sheet | in-window sheet | 640 × 480 px content |
+| Plan/Todo sheet | in-window sheet | 640 × 480 px content |
+| Clarify Question overlay | in-window overlay | 520 × 320 px content |
 
 ### 4.3 Application Shell Layout
 
@@ -1132,7 +1140,7 @@ ConPTY (Win32 P/Invoke) + VtNetCore rendering. Multiple tabs per project. Full 2
 
 ### 22.1 Plugin System
 
-Directory-based plugins with `nexusplugin.json` manifest. Run sandboxed (Job Object child process, stdio JSON-RPC hook protocol). Signature-verified before install. Hook types: `on_session_start`, `on_message_before_send`, `on_tool_call_before`, `on_tool_call_after`, `on_checkpoint`, `on_session_end`, `on_memory_write`, `on_plan_confirmed`, `on_todo_completed`.
+Directory-based plugins with `nexcode-plugin.json` manifest (per AD-0005). Run sandboxed (Job Object child process, stdio JSON-RPC hook protocol). Signature-verified before install. Hook types: `on_session_start`, `on_message_before_send`, `on_tool_call_before`, `on_tool_call_after`, `on_checkpoint`, `on_session_end`, `on_memory_write`, `on_plan_confirmed`, `on_todo_completed`.
 
 ### 22.2 Automations
 
@@ -1201,13 +1209,15 @@ Permission prompts appear as non-blocking cards in the message stream: **Allow O
 
 1. `actions/checkout` with full history
 2. `actions/setup-dotnet` — .NET 9 SDK latest patch
-3. `dotnet restore NexCode.sln`
-4. `dotnet build NexCode.sln -c Release`
+3. `dotnet restore NexCode.slnx`
+4. `dotnet build NexCode.slnx -c Release`
 5. `dotnet test --no-build -c Release --logger trx`
 6. `dotnet publish src/NexCode.Gui/NexCode.Gui.csproj -c Release -r win-x64 --self-contained`
 7. `msbuild /t:Publish /p:Configuration=Release /p:AppxPackageDir=./msix-output/`
 8. Sign using `signtool.exe` with PFX from `SIGNING_CERTIFICATE_PFX` secret (base64-decoded)
 9. `softprops/action-gh-release` creates GitHub Release with signed `.msix`, standalone `.exe` installer, and SHA256 checksums
+
+> **Solution filename:** the .NET 9 SDK uses the new XML-based solution format `NexCode.slnx`, not the legacy `NexCode.sln`. All `dotnet` commands and CI workflows operate on `NexCode.slnx`.
 
 ### 27.3 GitHub Actions Secrets Required
 
@@ -1466,7 +1476,7 @@ Projects map to directories on disk. Operations: Create (optional git init, opti
 ## 38. Repository & Project Structure
 
 ```
-NexCode.sln
+NexCode.slnx
 src/
   NexCode.Gui/                    # WinUI 3 application project
     Views/                        # XAML pages and controls
@@ -1872,6 +1882,26 @@ When you are ready to receive telemetry data:
 2. Store events in a database of your choice.
 3. Update the `NEXCODE_TELEMETRY_ENDPOINT` GitHub Actions secret with your endpoint URL.
 4. The next release build will inject this URL, and the app will start transmitting queued events to it.
+
+---
+
+### Step 13 — Packaged Dev Launch (Loose-Layout Registration)
+
+During development the GUI project produces a packaged loose layout — there is no installed MSIX yet, so launching `NexCode.Gui.exe` directly from `bin\` will fail with WinUI 3 packaging errors (the framework requires package identity). Verify GUI builds end-to-end like this on each iteration:
+
+1. `dotnet build NexCode.slnx`
+2. Locate the generated `AppxManifest.xml` under `src\NexCode.Gui\bin\<Configuration>\<TFM>\AppX\` (or `obj\<...>\AppX\` for some SDK versions).
+3. Register the loose layout with PowerShell:
+   ```powershell
+   Add-AppxPackage -Register "<absolute-path-to>\AppxManifest.xml"
+   ```
+4. Launch through the package family name:
+   ```powershell
+   explorer.exe "shell:AppsFolder\<PackageFamilyName>!App"
+   ```
+5. To unregister between iterations (if the manifest identity changes): `Get-AppxPackage *NexCode* | Remove-AppxPackage`.
+
+This is the verification path used by every slice in `docs/implementation-journal.md`. The packaged launch confirms the WinUI 3 + Windows App SDK runtime, MSAL, `Windows.Services.Store`, and any future bundled WebView2/Monaco assets work end-to-end against an installed package identity.
 
 ---
 
