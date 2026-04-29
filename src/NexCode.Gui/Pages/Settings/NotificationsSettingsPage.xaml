@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="NexCode.Gui.Pages.Settings.NotificationsSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="720" Spacing="20">
+            <TextBlock
+                FontSize="24"
+                FontWeight="SemiBold"
+                Foreground="{StaticResource NexCode.Text.Primary}"
+                Text="Notifications" />
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="12">
+                    <TextBlock FontWeight="SemiBold" Text="Per-category toggles" />
+                    <ToggleSwitch Header="Plan ready for confirmation" IsOn="True" />
+                    <ToggleSwitch Header="Permission requested" IsOn="True" />
+                    <ToggleSwitch Header="Long-running turn finished" IsOn="True" />
+                    <ToggleSwitch Header="Sub-agent completed" IsOn="False" />
+                    <ToggleSwitch Header="Helper / service errors" IsOn="True" />
+                    <ToggleSwitch Header="Update available" IsOn="True" />
+                    <ToggleSwitch Header="Subscription / billing" IsOn="True" />
+                    <ToggleSwitch Header="Idle reminders (5 min+)" IsOn="False" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="10">
+                    <TextBlock FontWeight="SemiBold" Text="Delivery" />
+                    <ToggleSwitch Header="Show toast notifications" IsOn="True" />
+                    <ToggleSwitch Header="Play sound" IsOn="False" />
+                    <ToggleSwitch Header="Show in system tray badge" IsOn="True" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

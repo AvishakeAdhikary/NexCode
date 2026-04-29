@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="NexCode.Gui.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:NexCode.Gui.ViewModels.Pages"
+    xmlns:settings="using:NexCode.Gui.Pages.Settings"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <DataTemplate x:Key="PanelEntryTemplate" x:DataType="vm:SettingsPanelEntry">
+            <NavigationViewItem Content="{x:Bind Title}" Tag="{x:Bind Tag}" />
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid Background="{StaticResource NexCode.Surface.Background}">
+        <NavigationView
+            x:Name="SettingsNavView"
+            IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="True"
+            IsSettingsVisible="False"
+            ItemInvoked="SettingsNavView_ItemInvoked"
+            MenuItemsSource="{x:Bind ViewModel.Panels, Mode=OneWay}"
+            MenuItemTemplate="{StaticResource PanelEntryTemplate}"
+            OpenPaneLength="240"
+            PaneDisplayMode="Left">
+            <NavigationView.PaneHeader>
+                <StackPanel Padding="16,12">
+                    <TextBlock
+                        FontSize="18"
+                        FontWeight="SemiBold"
+                        Foreground="{StaticResource NexCode.Text.Primary}"
+                        Text="Settings" />
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{StaticResource NexCode.Text.Secondary}"
+                        Text="Spec §32" />
+                </StackPanel>
+            </NavigationView.PaneHeader>
+
+            <Frame x:Name="SettingsContentFrame" />
+        </NavigationView>
+    </Grid>
+</Page>

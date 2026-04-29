@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexcode.dev/schemas/nexkeys.schema.json",
+  "title": "NexCode Key Bindings (.nexkeys)",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["command", "key"],
+    "properties": {
+      "command": { "type": "string" },
+      "key": { "type": "string" },
+      "when": { "type": "string" },
+      "args": {}
+    },
+    "additionalProperties": true
+  }
+}

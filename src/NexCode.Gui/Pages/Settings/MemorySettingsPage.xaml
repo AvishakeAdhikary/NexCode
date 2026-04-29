@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="NexCode.Gui.Pages.Settings.MemorySettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="720" Spacing="20">
+            <TextBlock
+                FontSize="24"
+                FontWeight="SemiBold"
+                Foreground="{StaticResource NexCode.Text.Primary}"
+                Text="Memory" />
+            <TextBlock
+                Foreground="{StaticResource NexCode.Text.Secondary}"
+                Text="Tunes injection and eviction. Memory entries themselves are managed on the Memories page." />
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="12">
+                    <TextBlock FontWeight="SemiBold" Text="Injection" />
+                    <ToggleSwitch Header="Inject global memories" IsOn="{x:Bind ViewModel.EnableGlobalInjection, Mode=TwoWay}" />
+                    <ToggleSwitch Header="Inject project-scoped memories" IsOn="{x:Bind ViewModel.EnableProjectInjection, Mode=TwoWay}" />
+                    <ToggleSwitch Header="Use session scratchpad" IsOn="{x:Bind ViewModel.EnableSessionScratchpad, Mode=TwoWay}" />
+                    <NumberBox
+                        Header="Top-N injected per turn"
+                        Maximum="64"
+                        Minimum="0"
+                        SpinButtonPlacementMode="Inline"
+                        Value="{x:Bind ViewModel.TopNInjection, Mode=TwoWay}" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="12">
+                    <TextBlock FontWeight="SemiBold" Text="Storage" />
+                    <NumberBox
+                        Header="Max stored memories"
+                        Maximum="100000"
+                        Minimum="0"
+                        SpinButtonPlacementMode="Inline"
+                        Value="{x:Bind ViewModel.MaxMemories, Mode=TwoWay}" />
+                    <ComboBox
+                        Header="Eviction policy"
+                        ItemsSource="{x:Bind ViewModel.EvictionPolicies}"
+                        SelectedItem="{x:Bind ViewModel.EvictionPolicy, Mode=TwoWay}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Command="{x:Bind ViewModel.ExportCommand}" Content="Export memories" />
+                        <Button Command="{x:Bind ViewModel.ImportCommand}" Content="Import memories" />
+                        <Button Command="{x:Bind ViewModel.ResetDefaultsCommand}" Content="Reset to defaults" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <TextBlock
+                Foreground="{StaticResource NexCode.Text.Secondary}"
+                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

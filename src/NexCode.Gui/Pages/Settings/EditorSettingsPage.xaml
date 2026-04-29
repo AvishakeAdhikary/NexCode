@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="NexCode.Gui.Pages.Settings.EditorSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="720" Spacing="20">
+            <TextBlock
+                FontSize="24"
+                FontWeight="SemiBold"
+                Foreground="{StaticResource NexCode.Text.Primary}"
+                Text="Editor" />
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="12">
+                    <TextBlock FontWeight="SemiBold" Text="Saving" />
+                    <ToggleSwitch Header="Auto-save on focus loss" IsOn="True" />
+                    <ToggleSwitch Header="Auto-save during turns" IsOn="False" />
+                    <NumberBox
+                        Header="Auto-save delay (ms)"
+                        Maximum="10000"
+                        Minimum="0"
+                        SpinButtonPlacementMode="Inline"
+                        Value="1500" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="12">
+                    <TextBlock FontWeight="SemiBold" Text="Indentation" />
+                    <NumberBox
+                        Header="Tab size"
+                        Maximum="16"
+                        Minimum="1"
+                        SpinButtonPlacementMode="Inline"
+                        Value="4" />
+                    <ToggleSwitch Header="Insert spaces (default)" IsOn="True" />
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{StaticResource NexCode.Text.Secondary}"
+                        Text="Per-language overrides will be exposed as a sub-table once language LSP servers register." />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="10">
+                    <TextBlock FontWeight="SemiBold" Text="JSON schema registrations" />
+                    <ListView Height="120">
+                        <ListViewItem Content="No registrations yet — wire-up pending." IsHitTestVisible="False" />
+                    </ListView>
+                    <Button Content="Register schema..." />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="10">
+                    <TextBlock FontWeight="SemiBold" Text="LSP server management" />
+                    <ListView Height="120">
+                        <ListViewItem Content="No language servers yet — wire-up pending." IsHitTestVisible="False" />
+                    </ListView>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Install language server..." />
+                        <Button Content="Refresh" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

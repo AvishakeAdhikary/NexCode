@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="NexCode.Gui.Pages.Settings.ShellSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="720" Spacing="20">
+            <TextBlock
+                FontSize="24"
+                FontWeight="SemiBold"
+                Foreground="{StaticResource NexCode.Text.Primary}"
+                Text="Shell" />
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="12">
+                    <ComboBox Header="Default shell" SelectedIndex="0">
+                        <ComboBoxItem Content="powershell.exe" />
+                        <ComboBoxItem Content="pwsh.exe" />
+                        <ComboBoxItem Content="cmd.exe" />
+                        <ComboBoxItem Content="bash" />
+                        <ComboBoxItem Content="zsh" />
+                    </ComboBox>
+                    <TextBox Header="Startup args" PlaceholderText="-NoLogo -NoProfile" />
+                    <TextBox Header="Working directory override" PlaceholderText="(use project root)" />
+                    <ToggleSwitch Header="Inject NexCode environment variables" IsOn="True" />
+                    <Button Content="Test shell" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

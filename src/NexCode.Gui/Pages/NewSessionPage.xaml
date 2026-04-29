@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="NexCode.Gui.Pages.NewSessionPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="640" Spacing="20">
+            <StackPanel Spacing="6">
+                <TextBlock
+                    FontSize="28"
+                    FontWeight="SemiBold"
+                    Foreground="{StaticResource NexCode.Text.Primary}"
+                    Text="Start a new session" />
+                <TextBlock
+                    Foreground="{StaticResource NexCode.Text.Secondary}"
+                    Text="Pick a project and the agent shape you want to talk to. You can change anything later." />
+            </StackPanel>
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="12">
+                    <TextBlock FontWeight="SemiBold" Text="Project" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            x:Name="ProjectPathTextBox"
+                            Header="Project path"
+                            PlaceholderText="C:\Projects\NexCode" />
+                        <Button
+                            Grid.Column="1"
+                            VerticalAlignment="Bottom"
+                            Click="PickProject_Click"
+                            Content="Browse..." />
+                    </Grid>
+                    <TextBox Header="Session name (optional)" PlaceholderText="e.g. Refactor auth flow" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="12">
+                    <TextBlock FontWeight="SemiBold" Text="Agent shape" />
+                    <ComboBox Header="Mode" SelectedIndex="0">
+                        <ComboBoxItem Content="Code" />
+                        <ComboBoxItem Content="Plan" />
+                        <ComboBoxItem Content="Debug" />
+                        <ComboBoxItem Content="Ask" />
+                    </ComboBox>
+                    <ComboBox Header="Model" SelectedIndex="0">
+                        <ComboBoxItem Content="(use provider default)" />
+                        <ComboBoxItem Content="claude-opus-4" />
+                        <ComboBoxItem Content="gpt-4.1" />
+                        <ComboBoxItem Content="gemini-2.5-pro" />
+                    </ComboBox>
+                    <ComboBox Header="Personality" SelectedIndex="0">
+                        <ComboBoxItem Content="Default" />
+                        <ComboBoxItem Content="Detailed" />
+                        <ComboBoxItem Content="Mentor" />
+                    </ComboBox>
+                    <ToggleSwitch Header="Sandbox file edits" IsOn="True" />
+                </StackPanel>
+            </Border>
+
+            <Button
+                Background="{StaticResource NexCode.Accent.Primary}"
+                Click="StartSession_Click"
+                Content="Start session"
+                Foreground="{StaticResource NexCode.Text.Primary}"
+                HorizontalAlignment="Stretch" />
+
+            <TextBlock
+                x:Name="StatusTextBlock"
+                Foreground="{StaticResource NexCode.Text.Secondary}" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="NexCode.Gui.Controls.PlanArtifactCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:NexCode.Gui.ViewModels"
+    xmlns:models="using:NexCode.Shared.Models"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <Border Style="{StaticResource NexCode.Card.Elevated}">
+        <Grid RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Title bar -->
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <FontIcon Glyph="&#xE8A5;" FontSize="16" Foreground="{ThemeResource NexCode.Accent.Primary}" />
+                <TextBlock
+                    Grid.Column="1"
+                    Style="{StaticResource NexCode.HeaderS}"
+                    Text="{x:Bind ViewModel.Title, Mode=OneWay}" />
+                <TextBlock
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource NexCode.Caption}"
+                    Text="{x:Bind GetVersionLabel(ViewModel.Version), Mode=OneWay}" />
+                <Border
+                    x:Name="StatusBadge"
+                    Grid.Column="3"
+                    Style="{StaticResource NexCode.Badge}"
+                    Background="{x:Bind GetStatusBrush(ViewModel.Status), Mode=OneWay}">
+                    <TextBlock
+                        FontSize="11"
+                        FontWeight="SemiBold"
+                        Foreground="White"
+                        Text="{x:Bind GetStatusLabel(ViewModel.Status), Mode=OneWay}" />
+                </Border>
+            </Grid>
+
+            <!-- Markdown preview -->
+            <RichTextBlock
+                x:Name="ContentRichTextBlock"
+                Grid.Row="1"
+                IsTextSelectionEnabled="True" />
+
+            <Button
+                Grid.Row="2"
+                Style="{StaticResource NexCode.Button.Tertiary}"
+                Click="ShowFull_Click"
+                Visibility="{x:Bind GetCollapseToggleVisibility(ViewModel.Content), Mode=OneWay}">
+                <TextBlock x:Name="ShowFullLabel" Text="Show full plan" />
+            </Button>
+
+            <!-- Action buttons row (only if PendingConfirmation) -->
+            <StackPanel
+                Grid.Row="3"
+                Orientation="Horizontal"
+                Spacing="8"
+                Visibility="{x:Bind GetActionVisibility(ViewModel.Status), Mode=OneWay}">
+                <Button
+                    Style="{StaticResource NexCode.Button.Primary}"
+                    Content="Confirm"
+                    Command="{x:Bind ViewModel.ConfirmCommand}" />
+                <Button
+                    Style="{StaticResource NexCode.Button.Secondary}"
+                    Content="Reject"
+                    Click="ToggleReject_Click" />
+                <Button
+                    Style="{StaticResource NexCode.Button.Secondary}"
+                    Content="Request changes"
+                    Click="ToggleChangeRequest_Click" />
+            </StackPanel>
+
+            <!-- Inline reject reason -->
+            <StackPanel
+                Grid.Row="4"
+                Spacing="6"
+                Visibility="{x:Bind RejectExpanded, Mode=OneWay}">
+                <TextBox
+                    PlaceholderText="Optional rejection reason"
+                    Text="{x:Bind ViewModel.RejectionReason, Mode=TwoWay}"
+                    AcceptsReturn="True"
+                    MinHeight="60" />
+                <Button
+                    Style="{StaticResource NexCode.Button.Danger}"
+                    Content="Submit rejection"
+                    Command="{x:Bind ViewModel.RejectCommand}" />
+            </StackPanel>
+
+            <!-- Inline change-request notes -->
+            <StackPanel
+                Grid.Row="5"
+                Spacing="6"
+                Visibility="{x:Bind ChangeRequestExpanded, Mode=OneWay}">
+                <TextBox
+                    PlaceholderText="Describe the requested changes"
+                    Text="{x:Bind ViewModel.ChangeRequestNotes, Mode=TwoWay}"
+                    AcceptsReturn="True"
+                    MinHeight="60" />
+                <Button
+                    Style="{StaticResource NexCode.Button.Primary}"
+                    Content="Send change request"
+                    Command="{x:Bind ViewModel.RequestChangesCommand}" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NexCode Monaco Host</title>
+<style>
+  html, body { height: 100%; margin: 0; padding: 0; background: #1e1e1e; color: #ddd; font-family: Consolas, monospace; }
+  #container, #diff { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+  #status { position: absolute; bottom: 4px; right: 8px; font-size: 11px; opacity: 0.6; pointer-events: none; }
+  .hidden { display: none !important; }
+</style>
+<!-- NOTE: real bundled Monaco is a Slice 0018 packaging task. CDN is only the dev placeholder. -->
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@latest/min/vs/loader.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="container"></div>
+<div id="diff" class="hidden"></div>
+<div id="status">monaco: loading...</div>
+
+<script>
+(function () {
+  const status = document.getElementById('status');
+  let editor = null;
+  let diffEditor = null;
+  let currentModel = null;
+  let isDiffMode = false;
+
+  function post(msg) {
+    try { window.chrome.webview.postMessage(JSON.stringify(msg)); } catch (e) { /* ignore */ }
+  }
+
+  function setStatus(text) { status.textContent = text; }
+
+  function ready() {
+    setStatus('monaco: ready');
+    post({ type: 'ready' });
+  }
+
+  function ensureEditor(language) {
+    if (editor) return editor;
+    editor = monaco.editor.create(document.getElementById('container'), {
+      value: '',
+      language: language || 'plaintext',
+      theme: 'vs-dark',
+      automaticLayout: true,
+      minimap: { enabled: false }
+    });
+    editor.onDidChangeModelContent(() => {
+      post({ type: 'contentChanged', value: editor.getValue() });
+    });
+    return editor;
+  }
+
+  function ensureDiffEditor() {
+    if (diffEditor) return diffEditor;
+    document.getElementById('container').classList.add('hidden');
+    document.getElementById('diff').classList.remove('hidden');
+    diffEditor = monaco.editor.createDiffEditor(document.getElementById('diff'), {
+      theme: 'vs-dark',
+      automaticLayout: true,
+      readOnly: true
+    });
+    return diffEditor;
+  }
+
+  function handle(message) {
+    if (!message || !message.type) return;
+    switch (message.type) {
+      case 'open': {
+        const ed = ensureEditor(message.language);
+        const model = monaco.editor.createModel(message.content || '', message.language || 'plaintext');
+        ed.setModel(model);
+        currentModel = model;
+        post({ type: 'opened', path: message.path });
+        break;
+      }
+      case 'getContent': {
+        post({ type: 'content', value: editor ? editor.getValue() : '' });
+        break;
+      }
+      case 'setLanguage': {
+        if (currentModel) monaco.editor.setModelLanguage(currentModel, message.language || 'plaintext');
+        break;
+      }
+      case 'setDiagnostics': {
+        if (!currentModel) break;
+        const markers = (message.markers || []).map(m => ({
+          startLineNumber: m.line,
+          startColumn: m.column,
+          endLineNumber: m.endLine || m.line,
+          endColumn: m.endColumn || (m.column + 1),
+          message: m.message,
+          severity: ({ error: 8, warning: 4, info: 2, hint: 1 })[m.severity] || 4,
+          source: m.source || 'lsp'
+        }));
+        monaco.editor.setModelMarkers(currentModel, 'nexcode', markers);
+        break;
+      }
+      case 'showDiff': {
+        isDiffMode = true;
+        const d = ensureDiffEditor();
+        const original = monaco.editor.createModel(message.before || '', message.language || 'plaintext');
+        const modified = monaco.editor.createModel(message.after || '', message.language || 'plaintext');
+        d.setModel({ original, modified });
+        post({ type: 'diffShown' });
+        break;
+      }
+      default: break;
+    }
+  }
+
+  function bindReceiver() {
+    if (!window.chrome || !window.chrome.webview) return;
+    window.chrome.webview.addEventListener('message', (ev) => {
+      let msg = ev.data;
+      if (typeof msg === 'string') {
+        try { msg = JSON.parse(msg); } catch (e) { return; }
+      }
+      handle(msg);
+    });
+  }
+
+  bindReceiver();
+
+  if (typeof require === 'function' && require.config) {
+    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@latest/min/vs' } });
+    require(['vs/editor/editor.main'], ready);
+  } else {
+    setStatus('monaco: loader missing (offline). Bundled Monaco arrives in Slice 0018.');
+    post({ type: 'error', error: 'loader_unavailable' });
+  }
+})();
+</script>
+</body>
+</html>

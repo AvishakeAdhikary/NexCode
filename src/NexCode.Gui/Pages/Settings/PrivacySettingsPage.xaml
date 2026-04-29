@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="NexCode.Gui.Pages.Settings.PrivacySettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="720" Spacing="20">
+            <TextBlock
+                FontSize="24"
+                FontWeight="SemiBold"
+                Foreground="{StaticResource NexCode.Text.Primary}"
+                Text="Privacy &amp; telemetry" />
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="12">
+                    <TextBlock FontWeight="SemiBold" Text="Telemetry" />
+                    <ToggleSwitch
+                        Header="Allow anonymous usage telemetry"
+                        IsOn="{x:Bind ViewModel.TelemetryEnabled, Mode=TwoWay}" />
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{StaticResource NexCode.Text.Secondary}"
+                        Text="Off by default. The helper buffers events locally and only uploads when this is enabled." />
+                    <TextBlock>
+                        <Run Text="Queue size: " />
+                        <Run Foreground="{StaticResource NexCode.Status.Info}" Text="{x:Bind ViewModel.QueueSize, Mode=OneWay}" />
+                    </TextBlock>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Command="{x:Bind ViewModel.ViewSamplePayloadCommand}" Content="View sample payload" />
+                        <Button Command="{x:Bind ViewModel.ClearQueueCommand}" Content="Clear queue" />
+                    </StackPanel>
+                    <Border
+                        Padding="10"
+                        Background="{StaticResource NexCode.Surface.Subtle}"
+                        CornerRadius="8">
+                        <TextBlock
+                            FontFamily="Consolas"
+                            FontSize="12"
+                            Text="{x:Bind ViewModel.SamplePayloadJson, Mode=OneWay}"
+                            TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="10">
+                    <TextBlock FontWeight="SemiBold" Text="GDPR &amp; account" />
+                    <Button Command="{x:Bind ViewModel.ExportGdprArchiveCommand}" Content="Export my data (GDPR)" />
+                    <Button
+                        Background="{StaticResource NexCode.Status.Error}"
+                        Command="{x:Bind ViewModel.RequestAccountDeletionCommand}"
+                        Content="Request account deletion"
+                        Foreground="{StaticResource NexCode.Text.Primary}" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock
+                Foreground="{StaticResource NexCode.Text.Secondary}"
+                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

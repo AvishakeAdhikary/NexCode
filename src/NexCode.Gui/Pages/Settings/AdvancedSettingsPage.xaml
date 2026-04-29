@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="NexCode.Gui.Pages.Settings.AdvancedSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Padding="24" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Spacing="6">
+            <TextBlock
+                FontSize="24"
+                FontWeight="SemiBold"
+                Foreground="{StaticResource NexCode.Text.Primary}"
+                Text="Advanced" />
+            <TextBlock
+                Foreground="{StaticResource NexCode.Text.Secondary}"
+                Text="Diagnostics, IPC inspector, database maintenance, and reset-to-defaults." />
+        </StackPanel>
+
+        <TabView Grid.Row="1" IsAddTabButtonVisible="False">
+            <TabViewItem Header="Debug log" IsClosable="False">
+                <Border
+                    Margin="0,8,0,0"
+                    Padding="12"
+                    Background="{StaticResource NexCode.Surface.Subtle}"
+                    BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <TextBlock
+                            FontFamily="Consolas"
+                            FontSize="12"
+                            Text="(no log entries yet — wire-up pending)"
+                            TextWrapping="NoWrap" />
+                    </ScrollViewer>
+                </Border>
+            </TabViewItem>
+
+            <TabViewItem Header="IPC inspector" IsClosable="False">
+                <Border
+                    Margin="0,8,0,0"
+                    Padding="12"
+                    Background="{StaticResource NexCode.Surface.Subtle}"
+                    BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                    <StackPanel Spacing="6">
+                        <TextBlock FontSize="12" Foreground="{StaticResource NexCode.Text.Secondary}" Text="Last 100 IPC messages will appear here." />
+                        <ListView Height="280">
+                            <ListViewItem Content="(empty)" IsHitTestVisible="False" />
+                        </ListView>
+                    </StackPanel>
+                </Border>
+            </TabViewItem>
+
+            <TabViewItem Header="Database" IsClosable="False">
+                <StackPanel Margin="0,8,0,0" Spacing="10">
+                    <Button Content="VACUUM database" />
+                    <Button Content="Show database path" />
+                    <Button Content="Re-key database (super-user only)" />
+                </StackPanel>
+            </TabViewItem>
+        </TabView>
+
+        <Border
+            Grid.Row="2"
+            Padding="16"
+            Background="{StaticResource NexCode.Surface.Card}"
+            BorderBrush="{StaticResource NexCode.Status.Error}"
+            BorderThickness="1"
+            CornerRadius="12">
+            <StackPanel Spacing="10">
+                <TextBlock FontWeight="SemiBold" Foreground="{StaticResource NexCode.Status.Error}" Text="Reset to defaults" />
+                <TextBlock
+                    Foreground="{StaticResource NexCode.Text.Secondary}"
+                    Text="Clears all preferences except subscription state. Two-step confirmation required."
+                    TextWrapping="Wrap" />
+                <Button Click="ResetButton_Click" Content="Begin reset..." />
+            </StackPanel>
+        </Border>
+
+        <TextBlock
+            x:Name="StatusTextBlock"
+            Grid.Row="3"
+            Foreground="{StaticResource NexCode.Text.Secondary}" />
+    </Grid>
+</Page>

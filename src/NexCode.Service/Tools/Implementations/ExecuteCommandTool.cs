@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using NexCode.Service.Sandbox;
 using NexCode.Shared.Json;
 
 namespace NexCode.Service.Tools.Implementations;
@@ -44,11 +45,6 @@ public sealed class ExecuteCommandTool : ITool
 
     public async Task<ToolOutcome> ExecuteAsync(ToolInvocationContext context, CancellationToken cancellationToken)
     {
-        if (context.SandboxEnabled)
-        {
-            return Error(context, "sandbox_blocked", "execute_command is disabled while the session sandbox is engaged.");
-        }
-
         var arguments = JsonSerializer.Deserialize<ExecuteCommandArguments>(
                             context.ArgumentsJson,
                             JsonSerialization.Options)
@@ -57,6 +53,25 @@ public sealed class ExecuteCommandTool : ITool
         if (string.IsNullOrWhiteSpace(arguments.Command))
         {
             return Error(context, "missing_command", "The 'command' argument is required.");
+        }
+
+        // Spec §14.1 partial: when the session sandbox is engaged, defence-in-depth
+        // string-match the command line against the network allowlist (provider hosts
+        // plus configured MCP endpoints) and refuse any host outside the allowlist.
+        // OS-level WFP enforcement is deferred to Slice 0019; this gate is best-effort.
+        // Commands that touch no recognisable hostname still fall through to the broader
+        // sandbox refusal below.
+        if (context.SandboxEnabled)
+        {
+            if (!NetworkAllowList.IsCommandAllowed(arguments.Command, GetMcpEndpoints(context), out var violatingHost))
+            {
+                return Error(
+                    context,
+                    "network_blocked_in_sandbox",
+                    $"Command references hostname '{violatingHost}' that is not in the sandbox network allowlist.");
+            }
+
+            return Error(context, "sandbox_blocked", "execute_command is disabled while the session sandbox is engaged.");
         }
 
         var shell = string.IsNullOrWhiteSpace(arguments.Shell) ? "powershell" : arguments.Shell!.ToLowerInvariant();
@@ -151,6 +166,15 @@ public sealed class ExecuteCommandTool : ITool
             CallId: context.CallId,
             ResultJson: payload,
             IsError: timedOut || exitCode != 0);
+    }
+
+    private static IEnumerable<string> GetMcpEndpoints(ToolInvocationContext context)
+    {
+        // Spec §16: when the MCP registry surfaces per-session endpoints, populate this from
+        // <c>context.Session</c>. Until then we return an empty enumerable so only the
+        // hard-coded provider/loopback hosts are allowed.
+        _ = context;
+        return Array.Empty<string>();
     }
 
     private static (string? Executable, string Arguments) ResolveShell(string shell, string command)

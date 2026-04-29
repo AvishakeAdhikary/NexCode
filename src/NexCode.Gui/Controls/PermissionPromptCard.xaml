@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="NexCode.Gui.Controls.PermissionPromptCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:NexCode.Gui.ViewModels"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <Border Style="{StaticResource NexCode.Card.Elevated}">
+        <StackPanel Spacing="12">
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE72E;" FontSize="16" Foreground="{ThemeResource NexCode.Status.Warning}" />
+                <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock
+                        Style="{StaticResource NexCode.HeaderS}"
+                        Text="{x:Bind ViewModel.ToolName, Mode=OneWay}" />
+                    <TextBlock
+                        Style="{StaticResource NexCode.Caption}"
+                        Text="{x:Bind ViewModel.Description, Mode=OneWay}" />
+                </StackPanel>
+                <FontIcon
+                    Grid.Column="2"
+                    Glyph="&#xE72E;"
+                    FontSize="14"
+                    Foreground="{ThemeResource NexCode.Status.Warning}"
+                    Visibility="{x:Bind GetLockVisibility(ViewModel.FullAccessLockShown), Mode=OneWay}" />
+            </Grid>
+
+            <Border Style="{StaticResource NexCode.Card.Subtle}">
+                <ScrollViewer MaxHeight="160" HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto">
+                    <TextBlock
+                        Style="{StaticResource NexCode.Code}"
+                        Text="{x:Bind ViewModel.ArgumentsPreview, Mode=OneWay}" />
+                </ScrollViewer>
+            </Border>
+
+            <Grid ColumnSpacing="8" RowSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Button
+                    Grid.Row="0" Grid.Column="0"
+                    Style="{StaticResource NexCode.Button.Primary}"
+                    HorizontalAlignment="Stretch"
+                    Command="{x:Bind ViewModel.AllowOnceCommand}"
+                    Content="Allow once" />
+                <Button
+                    Grid.Row="0" Grid.Column="1"
+                    Style="{StaticResource NexCode.Button.Secondary}"
+                    HorizontalAlignment="Stretch"
+                    Command="{x:Bind ViewModel.AllowForSessionCommand}"
+                    Content="Allow for session" />
+                <Button
+                    Grid.Row="1" Grid.Column="0"
+                    Style="{StaticResource NexCode.Button.Secondary}"
+                    HorizontalAlignment="Stretch"
+                    Command="{x:Bind ViewModel.DenyOnceCommand}"
+                    Content="Deny once" />
+                <Button
+                    Grid.Row="1" Grid.Column="1"
+                    Style="{StaticResource NexCode.Button.Danger}"
+                    HorizontalAlignment="Stretch"
+                    Command="{x:Bind ViewModel.DenyAlwaysCommand}"
+                    Content="Deny always" />
+            </Grid>
+        </StackPanel>
+    </Border>
+</UserControl>

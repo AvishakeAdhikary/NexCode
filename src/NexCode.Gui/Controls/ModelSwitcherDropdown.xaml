@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="NexCode.Gui.Controls.ModelSwitcherDropdown"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:NexCode.Gui.ViewModels"
+    mc:Ignorable="d"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <Button
+        x:Name="RootButton"
+        Style="{StaticResource NexCode.Button.Secondary}"
+        MinWidth="200">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <FontIcon FontSize="14" Glyph="&#xE7D8;" />
+            <TextBlock x:Name="ModelLabel" Text="Select model" />
+            <FontIcon FontSize="10" Glyph="&#xE70D;" />
+        </StackPanel>
+        <Button.Flyout>
+            <Flyout x:Name="DropFlyout" Placement="Bottom">
+                <Grid Width="320" RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBox
+                        x:Name="SearchBox"
+                        PlaceholderText="Search providers and models"
+                        TextChanged="SearchBox_TextChanged" />
+                    <ListView
+                        x:Name="ProviderList"
+                        Grid.Row="1"
+                        MaxHeight="320"
+                        SelectionChanged="ProviderList_SelectionChanged">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProviderEntryViewModel">
+                                <Grid Padding="6" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon FontSize="14" Glyph="&#xE7D8;" />
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock
+                                            Style="{StaticResource NexCode.Body}"
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind DisplayName, Mode=OneWay}" />
+                                        <TextBlock
+                                            Style="{StaticResource NexCode.Caption}"
+                                            Text="{x:Bind DefaultModelId, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                                        <Border
+                                            Style="{StaticResource NexCode.Badge}"
+                                            Visibility="{x:Bind GetVisionVisibility(SupportsVision), Mode=OneWay}">
+                                            <TextBlock FontSize="10" Text="Vision" />
+                                        </Border>
+                                        <Border
+                                            Style="{StaticResource NexCode.Badge}"
+                                            Visibility="{x:Bind GetToolsVisibility(SupportsTools), Mode=OneWay}">
+                                            <TextBlock FontSize="10" Text="Tools" />
+                                        </Border>
+                                        <FontIcon
+                                            FontSize="12"
+                                            Glyph="&#xE735;"
+                                            Foreground="{ThemeResource NexCode.Status.Warning}"
+                                            Visibility="{x:Bind GetDefaultVisibility(IsDefault), Mode=OneWay}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <Button
+                        Grid.Row="2"
+                        Style="{StaticResource NexCode.Button.Tertiary}"
+                        Click="OpenProviderSettings_Click"
+                        Content="Manage providers" />
+                </Grid>
+            </Flyout>
+        </Button.Flyout>
+    </Button>
+</UserControl>

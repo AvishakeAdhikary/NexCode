@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexcode.dev/schemas/nexcode-plugin.schema.json",
+  "title": "NexCode Plugin Manifest",
+  "type": "object",
+  "required": ["id", "name", "version", "entry"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-_.]*$" },
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "entry": { "type": "string" },
+    "description": { "type": "string" },
+    "author": { "type": "string" },
+    "homepage": { "type": "string", "format": "uri" },
+    "permissions": { "type": "array", "items": { "type": "string" } },
+    "contributes": { "type": "object" }
+  },
+  "additionalProperties": true
+}

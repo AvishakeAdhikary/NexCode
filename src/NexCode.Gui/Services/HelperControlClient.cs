@@ -6,7 +6,7 @@ using NexCode.Shared.Json;
 
 namespace NexCode.Gui.Services;
 
-internal sealed class HelperControlClient
+public sealed class HelperControlClient
 {
     private const string PipeName = "nexcode-service-dev";
 

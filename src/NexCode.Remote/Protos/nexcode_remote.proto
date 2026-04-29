@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+option csharp_namespace = "NexCode.Remote";
+
+package nexcode.remote;
+
+// Spec §23 — gRPC contract for nexcode-remote.
+// All session traffic flows through OpenSession as encrypted frames carried
+// over an mTLS + MSAL JWT authenticated channel. ECDH X25519 ephemeral keys
+// derive a per-session AES-256-GCM key for the E2E overlay defined in §23.4.
+service RemoteControl {
+  // Bidirectional streaming session. Client first sends a KeyExchange event,
+  // then EncryptedFrames. Server replies symmetrically.
+  rpc OpenSession (stream ClientEvent) returns (stream ServerEvent);
+
+  // Liveness probe used by the GUI status bar and CLI smoke tests.
+  rpc GetRemoteHealth (RemoteHealthRequest) returns (RemoteHealthReply);
+
+  // Single-shot ECDH key exchange used as a fast-path before opening a session
+  // (e.g. when the GUI wants to validate that the remote can negotiate keys
+  // before showing the connect button as healthy).
+  rpc ExchangeKeys (KeyExchangeRequest) returns (KeyExchangeReply);
+}
+
+message RemoteHealthRequest {}
+
+message RemoteHealthReply {
+  string service_name = 1;
+  string state = 2;
+  string version = 3;
+  string transport = 4;
+  string message = 5;
+}
+
+message KeyExchangeRequest {
+  bytes ephemeral_public_key = 1;
+  string session_id = 2;
+}
+
+message KeyExchangeReply {
+  bytes ephemeral_public_key = 1;
+  bytes server_signature = 2;
+}
+
+message EncryptedFrame {
+  uint64 sequence = 1;
+  bytes nonce = 2;
+  bytes ciphertext = 3;
+  bytes auth_tag = 4;
+}
+
+message ClientEvent {
+  oneof event {
+    KeyExchangeRequest key_exchange = 1;
+    EncryptedFrame encrypted_frame = 2;
+  }
+}
+
+message ServerEvent {
+  oneof event {
+    KeyExchangeReply key_exchange = 1;
+    EncryptedFrame encrypted_frame = 2;
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "version": "2026-04-29",
+  "entries": [
+    {
+      "id": "filesystem-mcp",
+      "kind": "mcp_server",
+      "name": "Filesystem MCP",
+      "publisher": "Anthropic",
+      "summary": "Read, write and search files within a sandboxed directory.",
+      "transport": "stdio",
+      "install": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "${ROOT}"] },
+      "tags": ["files", "official"]
+    },
+    {
+      "id": "github-mcp",
+      "kind": "mcp_server",
+      "name": "GitHub MCP",
+      "publisher": "GitHub",
+      "summary": "Browse repos, issues, and PRs using a GitHub PAT.",
+      "transport": "stdio",
+      "install": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"], "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${TOKEN}" } },
+      "tags": ["git", "code-review"]
+    },
+    {
+      "id": "slack-mcp",
+      "kind": "mcp_server",
+      "name": "Slack MCP",
+      "publisher": "Slack",
+      "summary": "Send messages and search channel history.",
+      "transport": "stdio",
+      "install": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"], "env": { "SLACK_BOT_TOKEN": "${TOKEN}" } },
+      "tags": ["chat", "team"]
+    },
+    {
+      "id": "postgres-mcp",
+      "kind": "mcp_server",
+      "name": "Postgres MCP",
+      "publisher": "Community",
+      "summary": "Run read-only SQL against a Postgres database.",
+      "transport": "stdio",
+      "install": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres", "${POSTGRES_URL}"] },
+      "tags": ["database", "sql"]
+    },
+    {
+      "id": "puppeteer-mcp",
+      "kind": "mcp_server",
+      "name": "Puppeteer MCP",
+      "publisher": "Community",
+      "summary": "Headless browsing and DOM scripting via Puppeteer.",
+      "transport": "stdio",
+      "install": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-puppeteer"] },
+      "tags": ["browser", "automation"]
+    },
+    {
+      "id": "memory-mcp",
+      "kind": "mcp_server",
+      "name": "Memory MCP",
+      "publisher": "Anthropic",
+      "summary": "A simple knowledge-graph backed memory store for assistants.",
+      "transport": "stdio",
+      "install": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"] },
+      "tags": ["memory", "official"]
+    }
+  ]
+}

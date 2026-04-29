@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="NexCode.Gui.Pages.EditorPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:NexCode.Gui.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+    <Grid Background="{ThemeResource LayerFillColorDefaultBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Padding="8" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Editor" />
+            <ToggleSwitch x:Name="AutoSaveToggle" Grid.Column="1" Header="Auto-save" />
+            <Button x:Name="OpenFileButton" Grid.Column="2" Content="Open file..." Click="OpenFileButton_Click" />
+        </Grid>
+
+        <TabView
+            x:Name="EditorTabView"
+            Grid.Row="1"
+            CanReorderTabs="True"
+            CanDragTabs="True"
+            TabCloseRequested="EditorTabView_TabCloseRequested"
+            AddTabButtonClick="EditorTabView_AddTabButtonClick" />
+    </Grid>
+</Page>

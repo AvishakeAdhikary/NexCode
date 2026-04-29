@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexcode.dev/schemas/nexmode.schema.json",
+  "title": "NexCode Mode (.nexmode)",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "system_prompt": { "type": "string" },
+    "tools": { "type": "array", "items": { "type": "string" } },
+    "default_personality": { "type": "string" },
+    "icon": { "type": "string" },
+    "color": { "type": "string" }
+  },
+  "additionalProperties": true
+}

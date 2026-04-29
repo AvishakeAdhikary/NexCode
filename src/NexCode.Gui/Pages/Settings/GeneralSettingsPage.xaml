@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="NexCode.Gui.Pages.Settings.GeneralSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="720" Spacing="20">
+            <TextBlock
+                FontSize="24"
+                FontWeight="SemiBold"
+                Foreground="{StaticResource NexCode.Text.Primary}"
+                Text="General" />
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="14">
+                    <TextBlock FontWeight="SemiBold" Text="Startup" />
+                    <ComboBox Header="Startup mode" SelectedIndex="0">
+                        <ComboBoxItem Content="Foreground (launch GUI)" />
+                        <ComboBoxItem Content="Background service (system tray)" />
+                    </ComboBox>
+                    <TextBox Header="Default project path" PlaceholderText="C:\Projects\..." />
+                    <ComboBox Header="Default mode" SelectedIndex="0">
+                        <ComboBoxItem Content="Code" />
+                        <ComboBoxItem Content="Plan" />
+                        <ComboBoxItem Content="Debug" />
+                        <ComboBoxItem Content="Ask" />
+                    </ComboBox>
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="14">
+                    <TextBlock FontWeight="SemiBold" Text="Locale &amp; updates" />
+                    <ComboBox Header="Default shell" SelectedIndex="0">
+                        <ComboBoxItem Content="powershell.exe" />
+                        <ComboBoxItem Content="pwsh.exe" />
+                        <ComboBoxItem Content="cmd.exe" />
+                        <ComboBoxItem Content="bash" />
+                    </ComboBox>
+                    <ComboBox Header="Language" SelectedIndex="0">
+                        <ComboBoxItem Content="English (United States)" />
+                        <ComboBoxItem Content="System default" />
+                    </ComboBox>
+                    <ComboBox Header="Date format" SelectedIndex="0">
+                        <ComboBoxItem Content="System default" />
+                        <ComboBoxItem Content="ISO 8601 (YYYY-MM-DD)" />
+                        <ComboBoxItem Content="MM/dd/yyyy" />
+                    </ComboBox>
+                    <ComboBox Header="Auto-update channel" SelectedIndex="0">
+                        <ComboBoxItem Content="Stable" />
+                        <ComboBoxItem Content="Beta" />
+                        <ComboBoxItem Content="Insiders" />
+                    </ComboBox>
+                </StackPanel>
+            </Border>
+
+            <Border
+                Padding="16"
+                Background="{StaticResource NexCode.Surface.Card}"
+                BorderBrush="{StaticResource NexCode.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="12">
+                <StackPanel Spacing="10">
+                    <TextBlock FontWeight="SemiBold" Text="Window" />
+                    <NumberBox
+                        Header="Min window width (px)"
+                        Maximum="3000"
+                        Minimum="800"
+                        SpinButtonPlacementMode="Inline"
+                        Value="1080" />
+                    <NumberBox
+                        Header="Min window height (px)"
+                        Maximum="2000"
+                        Minimum="600"
+                        SpinButtonPlacementMode="Inline"
+                        Value="720" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

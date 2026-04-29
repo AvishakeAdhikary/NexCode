@@ -10,4 +10,8 @@
     <ProjectReference Include="..\NexCode.Shared\NexCode.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="NexCode.Cli.Tests" />
+  </ItemGroup>
+
 </Project>

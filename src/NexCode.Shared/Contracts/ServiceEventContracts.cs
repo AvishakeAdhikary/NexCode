@@ -20,6 +20,24 @@ public static class ServiceEventTypes
     public const string PermissionRequest = "permission_request";
     public const string ProviderRetry = "provider.retry";
     public const string ProviderError = "provider.error";
+
+    // Slice 0014+
+    public const string MemoryUpdated = "memory.updated";
+    public const string McpStatus = "mcp.status";
+    public const string McpToolEvent = "mcp.tool_event";
+    public const string AgentSpawned = "agent.spawned";
+    public const string AgentEnded = "agent.ended";
+    public const string LinterDiagnostic = "linter.diagnostic";
+    public const string AutomationFired = "automation.fired";
+    public const string AutomationCompleted = "automation.completed";
+    public const string PluginEvent = "plugin.event";
+    public const string TelemetryQueueChanged = "telemetry.queue_changed";
+    public const string TerminalOutput = "terminal.output";
+    public const string TerminalExit = "terminal.exit";
+    public const string FileChanged = "file.changed";
+    public const string ConfigUpdated = "config.updated";
+    public const string SessionTitleUpdated = "session.title_updated";
+    public const string IapUpdated = "service.iap_updated";
 }
 
 public sealed record ServiceEventsPollRequest(
