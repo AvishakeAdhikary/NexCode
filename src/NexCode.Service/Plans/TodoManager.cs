@@ -302,12 +302,12 @@ public sealed class TodoManager(
             .Where(i => i.ListId == list.Id)
             .OrderBy(i => i.OrderIndex)
             .Select(i => new TodoItemSummary(
-                ItemId: i.Id,
-                ListId: i.ListId,
-                Text: i.Text,
-                Status: i.Status,
-                OrderIndex: i.OrderIndex,
-                UpdatedAt: i.UpdatedAt))
+                i.Id,
+                i.ListId,
+                i.Text,
+                i.Status,
+                i.OrderIndex,
+                i.UpdatedAt))
             .ToArrayAsync(cancellationToken);
 
         eventHub.Publish(

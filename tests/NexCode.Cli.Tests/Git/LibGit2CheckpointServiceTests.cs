@@ -98,7 +98,7 @@ public sealed class LibGit2CheckpointServiceTests
         File.WriteAllText(trackedPath, "hello world\n");
 
         using var repo = new Repository(path);
-        Commands.Stage(repo, "hello.txt");
+        LibGit2Sharp.Commands.Stage(repo, "hello.txt");
 
         var signature = new Signature("test", "test@example.com", DateTimeOffset.UtcNow);
         var seed = repo.Commit("seed", signature, signature, new CommitOptions { AllowEmptyCommit = false });

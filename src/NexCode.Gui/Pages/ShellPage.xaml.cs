@@ -57,6 +57,7 @@ public sealed partial class ShellPage : Page
             HeaderBar.Session = null;
             TranscriptRepeater.ItemsSource = null;
             UpdateComposerEnablement(active: null);
+            UpdateEmptyStateVisibility();
             return;
         }
 
@@ -64,6 +65,7 @@ public sealed partial class ShellPage : Page
         HeaderBar.Session = active;
         TranscriptRepeater.ItemsSource = active.Messages;
         UpdateComposerEnablement(active);
+        UpdateEmptyStateVisibility();
 
         if (active.Messages is INotifyCollectionChanged ncc)
         {
@@ -90,8 +92,20 @@ public sealed partial class ShellPage : Page
             DispatcherQueue.TryEnqueue(() =>
             {
                 TranscriptScrollViewer.ChangeView(null, TranscriptScrollViewer.ScrollableHeight, null, disableAnimation: false);
+                UpdateEmptyStateVisibility();
             });
         }
+        else
+        {
+            DispatcherQueue.TryEnqueue(UpdateEmptyStateVisibility);
+        }
+    }
+
+    private void UpdateEmptyStateVisibility()
+    {
+        var hasActive = ViewModel?.Active is not null;
+        var hasMessages = hasActive && ViewModel!.Active!.Messages.Count > 0;
+        EmptyStatePanel.Visibility = hasMessages ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void UpdateComposerEnablement(SessionViewModel? active)
@@ -131,5 +145,19 @@ public sealed partial class ShellPage : Page
     {
         var state = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control);
         return (state & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+    }
+
+    private void Hamburger_Click(object sender, RoutedEventArgs e)
+    {
+        NavOverlayHost.Visibility = NavOverlayHost.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
+    private void ContextToggle_Click(object sender, RoutedEventArgs e)
+    {
+        ContextOverlayHost.Visibility = ContextOverlayHost.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
     }
 }

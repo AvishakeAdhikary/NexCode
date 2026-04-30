@@ -1,32 +1,61 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
       - develop
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-solution:
+  build-test:
+    name: Build and test
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 9.x
 
       - name: Restore
         run: dotnet restore NexCode.slnx
 
       - name: Build
-        run: dotnet build NexCode.slnx --configuration Release --no-restore
+        run: dotnet build NexCode.slnx -c Release --no-restore
 
       - name: Test
-        run: dotnet test NexCode.slnx --configuration Release --no-build --logger trx
+        run: dotnet test NexCode.slnx -c Release --no-build --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/test-results.trx"
+          if-no-files-found: warn
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-coverage
+          path: "**/coverage.cobertura.xml"
+          if-no-files-found: ignore
 
       - name: Validate docs skeleton
         shell: pwsh

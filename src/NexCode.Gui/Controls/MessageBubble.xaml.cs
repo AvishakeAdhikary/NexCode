@@ -17,6 +17,7 @@ public sealed partial class MessageBubble : UserControl
     public MessageBubble()
     {
         InitializeComponent();
+        Unloaded += (_, _) => StopCaretBlink();
     }
 
     public MessageViewModel? Message
@@ -38,6 +39,7 @@ public sealed partial class MessageBubble : UserControl
                 newVm.PropertyChanged += bubble.OnMessagePropertyChanged;
             }
             bubble.Render();
+            bubble.UpdateStreamingCaret();
         }
     }
 
@@ -46,6 +48,10 @@ public sealed partial class MessageBubble : UserControl
         if (e.PropertyName == nameof(MessageViewModel.Content))
         {
             DispatcherQueue.TryEnqueue(Render);
+        }
+        else if (e.PropertyName == nameof(MessageViewModel.IsStreaming))
+        {
+            DispatcherQueue.TryEnqueue(UpdateStreamingCaret);
         }
     }
 
@@ -91,5 +97,25 @@ public sealed partial class MessageBubble : UserControl
         var paragraph = new Paragraph();
         paragraph.Inlines.Add(new Run { Text = plain });
         AssistantContent.Blocks.Add(paragraph);
+    }
+
+    private void UpdateStreamingCaret()
+    {
+        var shouldBlink = Message is { Role: MessageRole.Assistant, IsStreaming: true };
+        if (shouldBlink)
+        {
+            StreamingCaret.Visibility = Visibility.Visible;
+            CaretBlinkStoryboard.Begin();
+        }
+        else
+        {
+            StopCaretBlink();
+        }
+    }
+
+    private void StopCaretBlink()
+    {
+        CaretBlinkStoryboard.Stop();
+        StreamingCaret.Visibility = Visibility.Collapsed;
     }
 }

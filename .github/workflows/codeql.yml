@@ -4,12 +4,23 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   schedule:
-    - cron: "0 0 * * 1"
+    - cron: "0 0 * * 0"
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
+    name: Analyze (${{ matrix.language }})
     runs-on: windows-latest
     permissions:
       actions: read
@@ -22,18 +33,31 @@ jobs:
           - csharp
           - javascript
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: github/codeql-action/init@v3
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 9.0.x
-
-      - name: Build
+      - name: Setup .NET
         if: matrix.language == 'csharp'
-        run: dotnet build NexCode.slnx
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.x
 
-      - uses: github/codeql-action/analyze@v3
+      - name: Restore (C#)
+        if: matrix.language == 'csharp'
+        run: dotnet restore NexCode.slnx
+
+      - name: Build (C#)
+        if: matrix.language == 'csharp'
+        run: dotnet build NexCode.slnx -c Release --no-restore
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

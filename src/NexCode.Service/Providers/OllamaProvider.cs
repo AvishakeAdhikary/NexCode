@@ -138,6 +138,7 @@ public sealed class OllamaProvider : IModelProvider
 
             ProviderEvent? toEmit = null;
             ProviderEvent? toolEvent = null;
+            var isDone = false;
             try
             {
                 using var doc = JsonDocument.Parse(line);
@@ -146,65 +147,70 @@ public sealed class OllamaProvider : IModelProvider
                 {
                     failure = new ProviderErrorEvent("ollama.error", errEl.GetString() ?? "Ollama error", false);
                     faulted = true;
-                    break;
                 }
-                if (root.TryGetProperty("message", out var msg) && msg.ValueKind == JsonValueKind.Object)
+                else
                 {
-                    if (msg.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String)
+                    if (root.TryGetProperty("message", out var msg) && msg.ValueKind == JsonValueKind.Object)
                     {
-                        var text = content.GetString();
-                        if (!string.IsNullOrEmpty(text))
+                        if (msg.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String)
                         {
-                            toEmit = new TextDeltaEvent(text);
-                        }
-                    }
-                    if (msg.TryGetProperty("tool_calls", out var calls) && calls.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var call in calls.EnumerateArray())
-                        {
-                            if (call.ValueKind != JsonValueKind.Object) continue;
-                            if (!call.TryGetProperty("function", out var fn) || fn.ValueKind != JsonValueKind.Object) continue;
-                            var name = fn.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
-                            var args = fn.TryGetProperty("arguments", out var a)
-                                ? (a.ValueKind == JsonValueKind.String ? a.GetString() ?? "{}" : a.GetRawText())
-                                : "{}";
-                            var callId = $"ollama_{Guid.NewGuid():N}";
-                            if (emittedToolCalls.Add(callId))
+                            var text = content.GetString();
+                            if (!string.IsNullOrEmpty(text))
                             {
-                                toolEvent = new ToolUseRequestedEvent(callId, name, args);
+                                toEmit = new TextDeltaEvent(text);
+                            }
+                        }
+                        if (msg.TryGetProperty("tool_calls", out var calls) && calls.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var call in calls.EnumerateArray())
+                            {
+                                if (call.ValueKind != JsonValueKind.Object) continue;
+                                if (!call.TryGetProperty("function", out var fn) || fn.ValueKind != JsonValueKind.Object) continue;
+                                var name = fn.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
+                                var args = fn.TryGetProperty("arguments", out var a)
+                                    ? (a.ValueKind == JsonValueKind.String ? a.GetString() ?? "{}" : a.GetRawText())
+                                    : "{}";
+                                var callId = $"ollama_{Guid.NewGuid():N}";
+                                if (emittedToolCalls.Add(callId))
+                                {
+                                    toolEvent = new ToolUseRequestedEvent(callId, name, args);
+                                }
                             }
                         }
                     }
-                }
-                if (root.TryGetProperty("prompt_eval_count", out var pe) && pe.ValueKind == JsonValueKind.Number)
-                {
-                    promptTokens = pe.GetInt32();
-                }
-                if (root.TryGetProperty("eval_count", out var ec) && ec.ValueKind == JsonValueKind.Number)
-                {
-                    completionTokens = ec.GetInt32();
-                }
-                if (root.TryGetProperty("done_reason", out var dr) && dr.ValueKind == JsonValueKind.String)
-                {
-                    finishReason = dr.GetString() ?? finishReason;
-                }
-                if (root.TryGetProperty("done", out var doneEl) && doneEl.ValueKind == JsonValueKind.True)
-                {
-                    if (toEmit is not null) yield return toEmit;
-                    if (toolEvent is not null) yield return toolEvent;
-                    yield return new TurnCompletedEvent(finishReason, promptTokens, completionTokens);
-                    yield break;
+                    if (root.TryGetProperty("prompt_eval_count", out var pe) && pe.ValueKind == JsonValueKind.Number)
+                    {
+                        promptTokens = pe.GetInt32();
+                    }
+                    if (root.TryGetProperty("eval_count", out var ec) && ec.ValueKind == JsonValueKind.Number)
+                    {
+                        completionTokens = ec.GetInt32();
+                    }
+                    if (root.TryGetProperty("done_reason", out var dr) && dr.ValueKind == JsonValueKind.String)
+                    {
+                        finishReason = dr.GetString() ?? finishReason;
+                    }
+                    if (root.TryGetProperty("done", out var doneEl) && doneEl.ValueKind == JsonValueKind.True)
+                    {
+                        isDone = true;
+                    }
                 }
             }
             catch (JsonException ex)
             {
                 failure = new ProviderErrorEvent("ollama.parse", ex.Message, false);
                 faulted = true;
-                break;
             }
+
+            if (faulted) break;
 
             if (toEmit is not null) yield return toEmit;
             if (toolEvent is not null) yield return toolEvent;
+            if (isDone)
+            {
+                yield return new TurnCompletedEvent(finishReason, promptTokens, completionTokens);
+                yield break;
+            }
         }
 
         if (faulted && failure is not null)

@@ -38,3 +38,7 @@ This file maps implementation areas to the authoritative sections in `plan.md` a
 3. Shared contracts for IPC and session lifecycle.
 4. Data layer bootstrap with SQLCipher-ready EF Core foundation.
 5. WinUI shell bootstrap with minimum sizing and placeholder 3-column layout.
+
+## Operational Guides
+
+- [`manual-completion-guide.md`](manual-completion-guide.md) — end-to-end manual steps (env, Azure AD, code signing, Partner Center IAP, GitHub Actions secrets, asset bundling, Store submission, ops checklist) required to ship NexCode v1.0.

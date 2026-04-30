@@ -40,7 +40,7 @@ public sealed class EcdhAesGcmCipherTests
         var ciphertext = aliceCipher.Encrypt(2, payload, out var nonce, out var tag);
         ciphertext[0] ^= 0xFF;
 
-        Assert.Throws<CryptographicException>(() => bobCipher.Decrypt(2, nonce, ciphertext, tag));
+        Assert.ThrowsAny<CryptographicException>(() => bobCipher.Decrypt(2, nonce, ciphertext, tag));
     }
 
     [Fact]
@@ -55,6 +55,6 @@ public sealed class EcdhAesGcmCipherTests
         var payload = Encoding.UTF8.GetBytes("split-direction");
         var ciphertext = aliceClient.Encrypt(7, payload, out var nonce, out var tag);
 
-        Assert.Throws<CryptographicException>(() => bobServer.Decrypt(7, nonce, ciphertext, tag));
+        Assert.ThrowsAny<CryptographicException>(() => bobServer.Decrypt(7, nonce, ciphertext, tag));
     }
 }

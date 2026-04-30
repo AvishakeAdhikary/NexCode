@@ -25,6 +25,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Google.Protobuf" Version="3.*" />
+    <PackageReference Include="BouncyCastle.NetCore" Version="1.*" />
   </ItemGroup>
 
   <ItemGroup>

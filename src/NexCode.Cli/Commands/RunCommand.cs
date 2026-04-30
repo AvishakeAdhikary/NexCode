@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NexCode.Shared.Contracts;
 using NexCode.Shared.Ipc;
 using NexCode.Shared.Models;

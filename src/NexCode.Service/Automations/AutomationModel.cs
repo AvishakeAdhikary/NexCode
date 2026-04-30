@@ -135,11 +135,11 @@ public static class AutomationModel
 
         return kind switch
         {
-            "schedule" => Deserialize<ScheduleTrigger>(root) ?? new ManualTrigger(),
-            "file_change" => Deserialize<FileChangeTrigger>(root) ?? new ManualTrigger(),
-            "git_event" => Deserialize<GitEventTrigger>(root) ?? new ManualTrigger(),
+            "schedule" => (AutomationTrigger?)Deserialize<ScheduleTrigger>(root) ?? new ManualTrigger(),
+            "file_change" => (AutomationTrigger?)Deserialize<FileChangeTrigger>(root) ?? new ManualTrigger(),
+            "git_event" => (AutomationTrigger?)Deserialize<GitEventTrigger>(root) ?? new ManualTrigger(),
             "session_end" => new SessionEndTrigger(),
-            "webhook" => Deserialize<WebhookTrigger>(root) ?? new ManualTrigger(),
+            "webhook" => (AutomationTrigger?)Deserialize<WebhookTrigger>(root) ?? new ManualTrigger(),
             _ => new ManualTrigger()
         };
     }
@@ -186,13 +186,72 @@ public static class AutomationModel
             "call_webhook" => Deserialize<CallWebhookStep>(element),
             "git_action" => Deserialize<GitActionStep>(element),
             "wait" => Deserialize<WaitStep>(element),
-            "conditional" => Deserialize<ConditionalStep>(element),
+            "conditional" => ParseConditionalStep(element),
             _ => null
         };
     }
 
-    public static string SerializeSteps(IEnumerable<AutomationStep> steps) =>
-        JsonSerializer.Serialize<object>(steps.Cast<object>().ToArray(), JsonSerialization.Options);
+    private static ConditionalStep? ParseConditionalStep(JsonElement element)
+    {
+        var expression = element.TryGetProperty("expression", out var expr) && expr.ValueKind == JsonValueKind.String
+            ? expr.GetString() ?? string.Empty
+            : string.Empty;
+        var thenSteps = ParseNestedSteps(element, "then_steps");
+        var elseSteps = ParseNestedSteps(element, "else_steps");
+        return new ConditionalStep(expression, thenSteps, elseSteps);
+    }
+
+    private static AutomationStep[] ParseNestedSteps(JsonElement parent, string propertyName)
+    {
+        if (!parent.TryGetProperty(propertyName, out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<AutomationStep>();
+        }
+
+        var list = new List<AutomationStep>();
+        foreach (var item in arr.EnumerateArray())
+        {
+            var step = ParseStep(item);
+            if (step is not null) list.Add(step);
+        }
+        return list.ToArray();
+    }
+
+    public static string SerializeSteps(IEnumerable<AutomationStep> steps)
+    {
+        // System.Text.Json uses the declared static type for array elements, which loses
+        // the polymorphic "kind" discriminator on nested AutomationStep[] inside a
+        // ConditionalStep. We serialize manually to JsonNode so each step is written by
+        // its runtime type, then recursively re-serialize the nested then_steps/else_steps.
+        var array = new System.Text.Json.Nodes.JsonArray();
+        foreach (var step in steps)
+        {
+            array.Add(SerializeStepNode(step));
+        }
+        return array.ToJsonString(JsonSerialization.Options);
+    }
+
+    private static System.Text.Json.Nodes.JsonNode? SerializeStepNode(AutomationStep step)
+    {
+        if (step is ConditionalStep conditional)
+        {
+            var thenArr = new System.Text.Json.Nodes.JsonArray();
+            foreach (var s in conditional.ThenSteps) thenArr.Add(SerializeStepNode(s));
+            var elseArr = new System.Text.Json.Nodes.JsonArray();
+            foreach (var s in conditional.ElseSteps) elseArr.Add(SerializeStepNode(s));
+            return new System.Text.Json.Nodes.JsonObject
+            {
+                ["kind"] = "conditional",
+                ["expression"] = conditional.Expression,
+                ["then_steps"] = thenArr,
+                ["else_steps"] = elseArr,
+            };
+        }
+
+        // For non-conditional steps, use the runtime type so the kind property is emitted.
+        var json = JsonSerializer.Serialize(step, step.GetType(), JsonSerialization.Options);
+        return System.Text.Json.Nodes.JsonNode.Parse(json);
+    }
 
     private static T? Deserialize<T>(JsonElement element) =>
         element.Deserialize<T>(JsonSerialization.Options);

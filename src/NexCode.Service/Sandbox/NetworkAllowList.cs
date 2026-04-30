@@ -78,7 +78,11 @@ public static class NetworkAllowList
     {
         if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
         var trimmed = raw.Trim().Trim('"', '\'');
-        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+        // Only treat as URI if a scheme delimiter is present; otherwise Uri.TryCreate parses
+        // "api.anthropic.com:443" as scheme=api.anthropic.com which gives an empty Host.
+        if (trimmed.Contains("://", StringComparison.Ordinal)
+            && Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            && !string.IsNullOrEmpty(uri.Host))
         {
             return uri.Host.ToLowerInvariant();
         }

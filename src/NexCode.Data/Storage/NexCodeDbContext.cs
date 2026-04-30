@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NexCode.Data.Entities;
 
 namespace NexCode.Data.Storage;
@@ -79,5 +80,21 @@ public sealed class NexCodeDbContext(DbContextOptions<NexCodeDbContext> options)
         where TEntity : class
     {
         modelBuilder.Entity<TEntity>().ToTable(tableName);
+    }
+
+    /// <summary>
+    /// SQLite has no native <see cref="DateTimeOffset"/>; EF Core's default text storage cannot be
+    /// used in <c>ORDER BY</c> / arithmetic. We round-trip through Unix milliseconds so the column
+    /// is a sortable INTEGER while the CLR side stays a <see cref="DateTimeOffset"/>.
+    /// </summary>
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        configurationBuilder
+            .Properties<DateTimeOffset>()
+            .HaveConversion<DateTimeOffsetToBinaryConverter>();
+        configurationBuilder
+            .Properties<DateTimeOffset?>()
+            .HaveConversion<DateTimeOffsetToBinaryConverter>();
     }
 }

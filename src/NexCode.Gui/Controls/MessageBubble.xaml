@@ -8,6 +8,18 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
 
+    <UserControl.Resources>
+        <Storyboard x:Name="CaretBlinkStoryboard" RepeatBehavior="Forever">
+            <DoubleAnimationUsingKeyFrames
+                Storyboard.TargetName="StreamingCaret"
+                Storyboard.TargetProperty="Opacity">
+                <DiscreteDoubleKeyFrame KeyTime="0:0:0.0" Value="1.0" />
+                <DiscreteDoubleKeyFrame KeyTime="0:0:0.5" Value="0.0" />
+                <DiscreteDoubleKeyFrame KeyTime="0:0:1.0" Value="1.0" />
+            </DoubleAnimationUsingKeyFrames>
+        </Storyboard>
+    </UserControl.Resources>
+
     <Grid x:Name="RootGrid" Padding="0,4">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
@@ -25,7 +37,11 @@
             BorderBrush="{ThemeResource NexCode.Border.Subtle}"
             BorderThickness="1"
             CornerRadius="14,14,4,14"
+            Translation="0,0,8"
             Visibility="Collapsed">
+            <Border.Shadow>
+                <ThemeShadow />
+            </Border.Shadow>
             <TextBlock
                 x:Name="UserContentText"
                 Style="{StaticResource NexCode.Body}"
@@ -42,10 +58,24 @@
             BorderBrush="{ThemeResource NexCode.Border.Subtle}"
             BorderThickness="1"
             CornerRadius="14,14,14,4"
+            Translation="0,0,8"
             Visibility="Collapsed">
-            <RichTextBlock
-                x:Name="AssistantContent"
-                IsTextSelectionEnabled="True" />
+            <Border.Shadow>
+                <ThemeShadow />
+            </Border.Shadow>
+            <StackPanel Orientation="Vertical" Spacing="0">
+                <RichTextBlock
+                    x:Name="AssistantContent"
+                    IsTextSelectionEnabled="True" />
+                <TextBlock
+                    x:Name="StreamingCaret"
+                    Visibility="Collapsed"
+                    Margin="0,2,0,0"
+                    FontSize="14"
+                    FontWeight="SemiBold"
+                    Foreground="{ThemeResource NexCode.Accent.Primary}"
+                    Text="&#x258B;" />
+            </StackPanel>
         </Border>
 
         <Border

@@ -5,6 +5,7 @@ using NexCode.Service.Permissions;
 using NexCode.Service.SubAgents;
 using NexCode.Shared.Contracts;
 using NexCode.Shared.Json;
+using NexCode.Shared.Models;
 
 namespace NexCode.Service.Tools.Implementations;
 

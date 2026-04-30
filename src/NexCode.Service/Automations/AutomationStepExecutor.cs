@@ -34,7 +34,7 @@ public sealed class AutomationStepExecutor(
 
     private Task LogUnknown(AutomationStep step)
     {
-        logger.LogWarning("Automation step {Kind} has no executor; skipping.", step.Kind);
+        logger.LogWarning("Automation step {Kind} has no executor; skipping.", step.GetType().Name);
         return Task.CompletedTask;
     }
 

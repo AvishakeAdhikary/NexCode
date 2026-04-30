@@ -60,15 +60,84 @@
             ToolResult="{StaticResource ToolResultMessageTemplate}" />
     </Page.Resources>
 
-    <Grid>
+    <Grid x:Name="ShellRoot">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="LayoutStates">
+                <!-- Wide (>=1280): full 3-column 220 / * / 360 -->
+                <VisualState x:Name="WideState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1280" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="NavColumn.Width" Value="220" />
+                        <Setter Target="ContextColumn.Width" Value="360" />
+                        <Setter Target="NavRailWide.Visibility" Value="Visible" />
+                        <Setter Target="NavRailCompact.Visibility" Value="Collapsed" />
+                        <Setter Target="ContextHost.Visibility" Value="Visible" />
+                        <Setter Target="HamburgerButton.Visibility" Value="Collapsed" />
+                        <Setter Target="ContextToggleButton.Visibility" Value="Collapsed" />
+                    </VisualState.Setters>
+                </VisualState>
+
+                <!-- Medium (1024-1280): icon-only nav rail (60px), context 320 -->
+                <VisualState x:Name="MediumState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1024" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="NavColumn.Width" Value="60" />
+                        <Setter Target="ContextColumn.Width" Value="320" />
+                        <Setter Target="NavRailWide.Visibility" Value="Collapsed" />
+                        <Setter Target="NavRailCompact.Visibility" Value="Visible" />
+                        <Setter Target="ContextHost.Visibility" Value="Visible" />
+                        <Setter Target="HamburgerButton.Visibility" Value="Collapsed" />
+                        <Setter Target="ContextToggleButton.Visibility" Value="Collapsed" />
+                    </VisualState.Setters>
+                </VisualState>
+
+                <!-- Compact (768-1024): icon nav rail + center; context column hidden behind toggle -->
+                <VisualState x:Name="CompactState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="768" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="NavColumn.Width" Value="60" />
+                        <Setter Target="ContextColumn.Width" Value="0" />
+                        <Setter Target="NavRailWide.Visibility" Value="Collapsed" />
+                        <Setter Target="NavRailCompact.Visibility" Value="Visible" />
+                        <Setter Target="ContextHost.Visibility" Value="Collapsed" />
+                        <Setter Target="HamburgerButton.Visibility" Value="Collapsed" />
+                        <Setter Target="ContextToggleButton.Visibility" Value="Visible" />
+                    </VisualState.Setters>
+                </VisualState>
+
+                <!-- Tiny (<768): single column, both side panes overlay-only -->
+                <VisualState x:Name="TinyState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="NavColumn.Width" Value="0" />
+                        <Setter Target="ContextColumn.Width" Value="0" />
+                        <Setter Target="NavRailWide.Visibility" Value="Collapsed" />
+                        <Setter Target="NavRailCompact.Visibility" Value="Collapsed" />
+                        <Setter Target="ContextHost.Visibility" Value="Collapsed" />
+                        <Setter Target="HamburgerButton.Visibility" Value="Visible" />
+                        <Setter Target="ContextToggleButton.Visibility" Value="Visible" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="220" />
+            <ColumnDefinition x:Name="NavColumn" Width="220" />
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="380" MinWidth="360" MaxWidth="600" />
+            <ColumnDefinition x:Name="ContextColumn" Width="360" MinWidth="0" MaxWidth="600" />
         </Grid.ColumnDefinitions>
 
-        <!-- Column A: nav rail -->
+        <!-- Column A: nav rail (wide variant) -->
         <Border
+            x:Name="NavRailWide"
             Grid.Column="0"
             Background="{ThemeResource NexCode.Surface.Card}"
             BorderBrush="{ThemeResource NexCode.Border.Subtle}"
@@ -139,6 +208,61 @@
             </Grid>
         </Border>
 
+        <!-- Column A (compact): icon-only nav rail -->
+        <Border
+            x:Name="NavRailCompact"
+            Grid.Column="0"
+            Visibility="Collapsed"
+            Background="{ThemeResource NexCode.Surface.Card}"
+            BorderBrush="{ThemeResource NexCode.Border.Subtle}"
+            BorderThickness="0,0,1,0">
+            <Grid Padding="6" RowSpacing="6">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Button
+                    Style="{StaticResource NexCode.Button.Primary}"
+                    HorizontalAlignment="Stretch"
+                    ToolTipService.ToolTip="New chat"
+                    Command="{x:Bind ViewModel.NewChatCommand}">
+                    <FontIcon FontSize="14" Glyph="&#xE710;" />
+                </Button>
+
+                <StackPanel Grid.Row="1" Spacing="4" Margin="0,8,0,0">
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Search">
+                        <FontIcon FontSize="14" Glyph="&#xE721;" />
+                    </Button>
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.OpenHistoryCommand}" ToolTipService.ToolTip="History">
+                        <FontIcon FontSize="14" Glyph="&#xE81C;" />
+                    </Button>
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.OpenPlansCommand}" ToolTipService.ToolTip="Plans">
+                        <FontIcon FontSize="14" Glyph="&#xE8A5;" />
+                    </Button>
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Memories">
+                        <FontIcon FontSize="14" Glyph="&#xE7B8;" />
+                    </Button>
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Plugins">
+                        <FontIcon FontSize="14" Glyph="&#xE950;" />
+                    </Button>
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Automations">
+                        <FontIcon FontSize="14" Glyph="&#xE945;" />
+                    </Button>
+                </StackPanel>
+
+                <Button
+                    Grid.Row="2"
+                    Style="{StaticResource NexCode.Button.Secondary}"
+                    HorizontalAlignment="Stretch"
+                    Command="{x:Bind ViewModel.OpenSettingsCommand}"
+                    ToolTipService.ToolTip="Settings">
+                    <FontIcon FontSize="14" Glyph="&#xE713;" />
+                </Button>
+            </Grid>
+        </Border>
+
         <!-- Column B: main session area -->
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
@@ -148,9 +272,42 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <controls:SessionHeaderBar
-                x:Name="HeaderBar"
-                Grid.Row="0" />
+            <!-- Header strip with optional toggle buttons -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button
+                    x:Name="HamburgerButton"
+                    Grid.Column="0"
+                    Visibility="Collapsed"
+                    Style="{StaticResource NexCode.Button.Tertiary}"
+                    Margin="6,0,0,0"
+                    VerticalAlignment="Center"
+                    Click="Hamburger_Click"
+                    ToolTipService.ToolTip="Open navigation">
+                    <FontIcon FontSize="14" Glyph="&#xE700;" />
+                </Button>
+
+                <controls:SessionHeaderBar
+                    x:Name="HeaderBar"
+                    Grid.Column="1" />
+
+                <Button
+                    x:Name="ContextToggleButton"
+                    Grid.Column="2"
+                    Visibility="Collapsed"
+                    Style="{StaticResource NexCode.Button.Tertiary}"
+                    Margin="0,0,6,0"
+                    VerticalAlignment="Center"
+                    Click="ContextToggle_Click"
+                    ToolTipService.ToolTip="Toggle context panel">
+                    <FontIcon FontSize="14" Glyph="&#xE713;" />
+                </Button>
+            </Grid>
 
             <!-- Status bar (plan/todo) -->
             <Border
@@ -180,19 +337,65 @@
             </Border>
 
             <!-- Virtualized transcript -->
-            <ScrollViewer
-                Grid.Row="2"
-                x:Name="TranscriptScrollViewer"
-                Padding="20"
-                VerticalScrollBarVisibility="Auto">
-                <ItemsRepeater
-                    x:Name="TranscriptRepeater"
-                    ItemTemplate="{StaticResource MessageSelector}">
-                    <ItemsRepeater.Layout>
-                        <StackLayout Spacing="6" />
-                    </ItemsRepeater.Layout>
-                </ItemsRepeater>
-            </ScrollViewer>
+            <Grid Grid.Row="2">
+                <ScrollViewer
+                    x:Name="TranscriptScrollViewer"
+                    Padding="20"
+                    VerticalScrollBarVisibility="Auto">
+                    <ItemsRepeater
+                        x:Name="TranscriptRepeater"
+                        ItemTemplate="{StaticResource MessageSelector}">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="6" />
+                        </ItemsRepeater.Layout>
+                    </ItemsRepeater>
+                </ScrollViewer>
+
+                <!-- Empty state overlay -->
+                <Grid
+                    x:Name="EmptyStatePanel"
+                    Visibility="Collapsed"
+                    Background="Transparent"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch">
+                    <StackPanel
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        MaxWidth="420"
+                        Spacing="16">
+                        <Border
+                            Width="72"
+                            Height="72"
+                            HorizontalAlignment="Center"
+                            CornerRadius="{StaticResource NexCode.CornerRadius.XL}"
+                            Background="{ThemeResource NexCode.Accent.Subtle}">
+                            <FontIcon
+                                FontSize="32"
+                                Glyph="&#xE8BD;"
+                                Foreground="{ThemeResource NexCode.Accent.Primary}" />
+                        </Border>
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            Style="{StaticResource NexCode.HeaderM}"
+                            Text="Welcome to NexCode" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            TextAlignment="Center"
+                            Style="{StaticResource NexCode.Body}"
+                            Foreground="{ThemeResource NexCode.Text.Secondary}"
+                            Text="Start a new session to begin chatting with your assistant. Plans, todos, and checkpoints will appear in this transcript." />
+                        <Button
+                            HorizontalAlignment="Center"
+                            Style="{StaticResource NexCode.Button.Primary}"
+                            Command="{x:Bind ViewModel.NewChatCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="12" Glyph="&#xE710;" />
+                                <TextBlock Text="Start a new session" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Grid>
 
             <!-- Input area -->
             <Border
@@ -231,6 +434,7 @@
 
         <!-- Column C: context tabs -->
         <Border
+            x:Name="ContextHost"
             Grid.Column="2"
             Background="{ThemeResource NexCode.Surface.Card}"
             BorderBrush="{ThemeResource NexCode.Border.Subtle}"
@@ -268,5 +472,92 @@
                 </TabViewItem>
             </TabView>
         </Border>
+
+        <!-- Overlay flyout for the context panel (compact / tiny) -->
+        <Grid
+            x:Name="ContextOverlayHost"
+            Grid.Column="0"
+            Grid.ColumnSpan="3"
+            Visibility="Collapsed"
+            Background="#80010409">
+            <Border
+                Width="360"
+                HorizontalAlignment="Right"
+                Background="{ThemeResource NexCode.Surface.Card}"
+                BorderBrush="{ThemeResource NexCode.Border.Strong}"
+                BorderThickness="1,0,0,0"
+                Translation="0,0,32">
+                <Border.Shadow>
+                    <ThemeShadow />
+                </Border.Shadow>
+                <Grid RowSpacing="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Padding="14,10" Background="{ThemeResource NexCode.Surface.Card}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource NexCode.HeaderS}" Text="Context" VerticalAlignment="Center" />
+                        <Button
+                            Grid.Column="1"
+                            Style="{StaticResource NexCode.Button.Tertiary}"
+                            Click="ContextToggle_Click"
+                            ToolTipService.ToolTip="Close">
+                            <FontIcon FontSize="12" Glyph="&#xE711;" />
+                        </Button>
+                    </Grid>
+                    <TabView Grid.Row="1" IsAddTabButtonVisible="False">
+                        <TabViewItem Header="Run" IsClosable="False">
+                            <StackPanel Padding="14" Spacing="8">
+                                <TextBlock Style="{StaticResource NexCode.HeaderS}" Text="Run activity" />
+                                <TextBlock Style="{StaticResource NexCode.Caption}" Text="Run timeline appears in this overlay on smaller windows." />
+                            </StackPanel>
+                        </TabViewItem>
+                        <TabViewItem Header="Git" IsClosable="False">
+                            <StackPanel Padding="14" Spacing="8">
+                                <TextBlock Style="{StaticResource NexCode.HeaderS}" Text="Git manager" />
+                                <TextBlock Style="{StaticResource NexCode.Caption}" Text="Git status, branches, and checkpoints." />
+                            </StackPanel>
+                        </TabViewItem>
+                        <TabViewItem Header="Editor" IsClosable="False">
+                            <StackPanel Padding="14" Spacing="8">
+                                <TextBlock Style="{StaticResource NexCode.HeaderS}" Text="Editor" />
+                                <TextBlock Style="{StaticResource NexCode.Caption}" Text="Monaco editor placeholder." />
+                            </StackPanel>
+                        </TabViewItem>
+                    </TabView>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Overlay flyout for nav (tiny only) -->
+        <Grid
+            x:Name="NavOverlayHost"
+            Grid.Column="0"
+            Grid.ColumnSpan="3"
+            Visibility="Collapsed"
+            Background="#80010409">
+            <Border
+                Width="240"
+                HorizontalAlignment="Left"
+                Background="{ThemeResource NexCode.Surface.Card}"
+                BorderBrush="{ThemeResource NexCode.Border.Strong}"
+                BorderThickness="0,0,1,0"
+                Translation="0,0,32">
+                <Border.Shadow>
+                    <ThemeShadow />
+                </Border.Shadow>
+                <StackPanel Padding="12" Spacing="6">
+                    <TextBlock Style="{StaticResource NexCode.HeaderS}" Text="Navigation" />
+                    <Button Style="{StaticResource NexCode.Button.Primary}" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.NewChatCommand}" Content="New chat" />
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{x:Bind ViewModel.OpenHistoryCommand}" Content="History" />
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{x:Bind ViewModel.OpenPlansCommand}" Content="Plans" />
+                    <Button Style="{StaticResource NexCode.Button.Secondary}" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.OpenSettingsCommand}" Content="Settings" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Page>
