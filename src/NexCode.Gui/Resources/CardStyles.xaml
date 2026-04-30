@@ -71,7 +71,7 @@
     </Style>
 
     <!-- Pill button used for MCQ inputs -->
-    <Style x:Key="NexCode.PillButton" TargetType="Button">
+    <Style x:Key="NexCode.PillButton" TargetType="RadioButton">
         <Setter Property="Background" Value="{ThemeResource NexCode.Surface.Subtle}" />
         <Setter Property="BorderBrush" Value="{ThemeResource NexCode.Border.Subtle}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -82,7 +82,7 @@
         <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
 
-    <Style x:Key="NexCode.PillButton.Selected" TargetType="Button" BasedOn="{StaticResource NexCode.PillButton}">
+    <Style x:Key="NexCode.PillButton.Selected" TargetType="RadioButton" BasedOn="{StaticResource NexCode.PillButton}">
         <Setter Property="Background" Value="{ThemeResource NexCode.Accent.Subtle}" />
         <Setter Property="BorderBrush" Value="{ThemeResource NexCode.Accent.Primary}" />
         <Setter Property="Foreground" Value="{ThemeResource NexCode.Accent.Primary}" />

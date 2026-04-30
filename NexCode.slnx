@@ -4,6 +4,7 @@
     <Project Path="src/NexCode.Data/NexCode.Data.csproj" />
     <Project Path="src/NexCode.Gui/NexCode.Gui.csproj">
       <Platform Solution="Debug|*" Project="x64" />
+      <Deploy Solution="Debug|*" />
     </Project>
     <Project Path="src/NexCode.Marketplace.Sdk/NexCode.Marketplace.Sdk.csproj" />
     <Project Path="src/NexCode.Remote/NexCode.Remote.csproj" />
