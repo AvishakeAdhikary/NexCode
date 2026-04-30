@@ -543,3 +543,32 @@ This journal is append-only. Each slice must record the spec references, intende
   - Run `dotnet test NexCode.slnx` to confirm green on a fresh clone.
   - Follow `docs/manual-completion-guide.md` end-to-end to ship the Microsoft Store v1.0 release.
   - Resolve the WinAppSDK / .NET 10 SDK XamlCompiler.exe interaction by pinning `global.json` per §2 of the manual guide (or wait for WinAppSDK 2.1+).
+
+## Slice 0019 — Card Style Translation Recovery
+
+- Status: completed
+- Goal: resolve the WinUI XAML compiler failure in `CardStyles.xaml` without changing the existing elevated-card behavior or adding dependencies.
+- Spec references: Sections 4, 38, 39; WinUI skill `foundation-template-first-recovery.md`.
+- Affected files:
+  - `docs/implementation-journal.md`
+  - `src/NexCode.Gui/Resources/CardStyles.xaml`
+  - `src/NexCode.Gui/Controls/ClarifyQuestionCard.xaml`
+  - `src/NexCode.Gui/Controls/PermissionPromptCard.xaml`
+  - `src/NexCode.Gui/Controls/PlanArtifactCard.xaml`
+  - `src/NexCode.Gui/Controls/TodoArtifactCard.xaml`
+- Acceptance criteria:
+  - `NexCode.Gui` no longer sets `Translation` through a style `Setter`
+  - every current `NexCode.Card.Elevated` consumer preserves the existing `0,0,16` translation depth
+  - the project builds cleanly past the reported WMC0095 error
+- Verification commands:
+  - `dotnet build NexCode.slnx -p:Platform=x64`
+- Notes:
+  - `NexCode.Card.Elevated` is currently consumed by `ClarifyQuestionCard`, `PermissionPromptCard`, `PlanArtifactCard`, and `TodoArtifactCard`.
+- Final notes:
+  - Removed the invalid `Translation` style setter from `NexCode.Card.Elevated` and preserved the same `0,0,16` depth on each current elevated-card usage site instead.
+  - This keeps the existing shadow/elevation visuals without introducing a new dependency or changing the shared resource merge structure in `App.xaml`.
+  - Future consumers of `NexCode.Card.Elevated` should also set `Translation="0,0,16"` explicitly unless the project later moves to a custom control/template approach for elevated cards.
+- Verification results:
+  - `dotnet build src/NexCode.Gui/NexCode.Gui.csproj` ✅ (224 warnings, 0 errors; the reported `WMC0095` no longer occurs)
+  - direct executable launch ❌ exits immediately with code `-532462766`, consistent with packaged WinUI startup without the right package-identity path
+  - package-identity launch via `shell:AppsFolder` ⚠️ did not produce objective process/window evidence in this session, so runtime verification remains inconclusive even though the compile-time fix is confirmed

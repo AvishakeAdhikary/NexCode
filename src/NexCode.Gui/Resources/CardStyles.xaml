@@ -20,7 +20,6 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="{StaticResource NexCode.CornerRadius.L}" />
         <Setter Property="Padding" Value="{StaticResource NexCode.Padding.L}" />
-        <Setter Property="Translation" Value="0,0,16" />
         <Setter Property="Shadow" Value="{StaticResource NexCode.CardShadow}" />
     </Style>
 

@@ -9,7 +9,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
 
-    <Border Style="{StaticResource NexCode.Card.Elevated}">
+    <Border Style="{StaticResource NexCode.Card.Elevated}" Translation="0,0,16">
         <Grid RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
