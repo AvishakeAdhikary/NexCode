@@ -79,11 +79,19 @@
     <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
   </PropertyGroup>
 
-  <!-- Publish Properties -->
+  <!--
+    Publish Properties.
+    PublishReadyToRun is False in every configuration. R2R compilation requires a runtime
+    package matching the target RID at build time. CI and CodeQL invoke dotnet build and
+    dotnet publish without always passing the runtime-identifier and self-contained flags,
+    which trips NETSDK1094 (a valid runtime package was not found). The 5 percent startup
+    perf gain from R2R is not worth the operational fragility for a desktop app whose cold
+    start budget is already 3s. Re-enable per-publish via dotnet publish with an explicit
+    runtime identifier and -p:PublishReadyToRun=true when needed.
+    PublishTrimmed is False because WinUI 3 + reflection-heavy bindings break under trim.
+  -->
   <PropertyGroup>
-    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <PublishReadyToRun>False</PublishReadyToRun>
+    <PublishTrimmed>False</PublishTrimmed>
   </PropertyGroup>
 </Project>

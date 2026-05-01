@@ -19,3 +19,14 @@ publish/
 
 # Claude AI files
 .claude/
+
+# Local-only configuration overrides (developer machine secrets / IDs)
+# appsettings.Local.json is loaded by Program.cs after appsettings.Development.json so it
+# can shadow any field. Use it for anything you don't want in the public repo.
+**/appsettings.Local.json
+**/appsettings.*.local.json
+**/secrets.json
+set-dev-env*.ps1
+.env
+.env.local
+.env.*.local

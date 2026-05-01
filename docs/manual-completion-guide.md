@@ -129,23 +129,25 @@ NexCode signs users in with Microsoft Entra ID (formerly Azure AD) using MSAL.NE
    - **Directory (tenant) ID** → save as `NEXCODE_AAD_TENANT_ID`. Use `common` if you want consumer + work accounts, or paste your tenant GUID if you're locking it down.
 5. Go to **Authentication** → scroll to **Advanced settings** → set **Allow public client flows** to **Yes** → **Save**.
 6. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions** → check `User.Read` → **Add permissions**.
-7. Click **Grant admin consent for <directory>** (only available if you're a directory admin; for `common` tenant it self-consents on first user sign-in).
+7. **Grant admin consent (optional for multitenant + MSA apps).** Skip this if you registered the app with multitenant + personal-MSA support and don't want to consent on behalf of "all users in your organization". MSAL public-client native flows self-consent **per individual user** on first sign-in — every user just sees the standard consent screen for `User.Read`. Grant admin consent only when you're rolling NexCode out inside a single org and want to suppress the per-user prompt for that one tenant.
 
 ### Where to paste the IDs locally
 
-For development, edit `src/NexCode.Service/appsettings.Development.json`:
+> **Public vs secret.** Azure AD **Application (client) ID** and **Directory (tenant) ID** are *public* identifiers — they are exposed by `https://login.microsoftonline.com/{tenantId}/.well-known/openid-configuration` for any AAD tenant and cannot be used as credentials on their own. MSAL public-client native flows have **no client secret** by design. You can technically commit these IDs to a public repo without harming security. We still keep them in a gitignored local file by default, partly out of habit and partly to keep dev-machine identifiers off the main branch.
+
+The recommended path: copy `src/NexCode.Service/appsettings.Local.json.example` to `src/NexCode.Service/appsettings.Local.json` and paste your IDs there. `appsettings.Local.json` is in `.gitignore`, and `Program.cs` loads it after `appsettings.Development.json` so its values shadow.
 
 ```json
 {
   "Auth": {
-    "ClientId": "<paste NEXCODE_AAD_CLIENT_ID here>",
-    "TenantId": "<paste NEXCODE_AAD_TENANT_ID here, or 'common'>",
+    "ClientId": "96cb39d8-5dc5-49dc-b42a-a6fa9afe3630",
+    "TenantId": "247b3ce0-a1e7-429f-8bb0-b438d987fd09",
     "RedirectUri": "https://login.microsoftonline.com/common/oauth2/nativeclient"
   }
 }
 ```
 
-Or set the matching environment variables before launching the helper:
+Or set the matching environment variables before launching the helper (also gitignored in `set-dev-env*.ps1`):
 
 ```powershell
 $env:NEXCODE_AAD_CLIENT_ID  = "<your client id>"
@@ -153,7 +155,7 @@ $env:NEXCODE_AAD_TENANT_ID  = "<your tenant id or 'common'>"
 dotnet run --project src/NexCode.Service
 ```
 
-The helper reads env vars first, then `appsettings.Development.json`, then production `appsettings.json`. Production builds get the IDs injected by GitHub Actions from the secrets in [§6](#6-github-actions-secrets).
+The helper reads env vars first, then `appsettings.Local.json` (gitignored), then `appsettings.Development.json` (tracked, no secrets), then production `appsettings.json`. Production builds get the IDs injected by GitHub Actions from the secrets in [§6](#6-github-actions-secrets).
 
 ---
 
@@ -161,30 +163,43 @@ The helper reads env vars first, then `appsettings.Development.json`, then produ
 
 Spec §41 Step 2 requires a signed `.msix`. You have three paths.
 
+> **Recommended path for "Store-only distribution + local sideload for testing":** use **Option A** below to generate a self-signed cert (10 seconds), trust it on this machine for sideload installs, and ship to the Store with **Option C** — the Store re-signs your `.msix` with Microsoft's publicly-trusted publisher cert during ingestion, so the self-signed cert is **only** used for your local install. This is the cheapest, fastest path and is what most v1.0 NexCode operators are doing.
+
 ### Option A — Self-signed (development only)
 
 Use this for local F5 / sideload runs only. Windows refuses to install self-signed packages without explicit trust-store import.
 
+> **Critical**: the certificate **`Subject` must exactly match `<Identity Publisher="...">`** in `src/NexCode.Gui/Package.appxmanifest`, including case and trailing whitespace, or `Add-AppxPackage` will fail with `0x80073CF0` ("the publisher of an installed package does not match the publisher of the package being installed"). The manifest is currently set to `Publisher="CN=8559855F-6955-4418-A6D8-835C3238CF34"` (your Partner Center publisher identity), so the cert subject below uses that exact value. If you swap the manifest to a different publisher you must regenerate the cert.
+
+Run as a **non-elevated** PowerShell (the `Cert:\CurrentUser\My` store doesn't need admin); the second `Import-PfxCertificate` line that pushes into `Cert:\LocalMachine\TrustedPeople` does — open an elevated PS for that one.
+
 ```powershell
+# 1) Generate self-signed cert with the Subject the manifest expects.
 $cert = New-SelfSignedCertificate `
   -Type Custom `
-  -Subject "CN=NexCode Dev, O=NexCode, C=US" `
+  -Subject "CN=8559855F-6955-4418-A6D8-835C3238CF34" `
   -KeyUsage DigitalSignature `
   -FriendlyName "NexCode Dev Code Signing" `
   -CertStoreLocation "Cert:\CurrentUser\My" `
-  -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+  -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}") `
+  -NotAfter (Get-Date).AddYears(2)
 
+# 2) Export to .pfx so MSBuild's signing target can find it.
 $pwd = ConvertTo-SecureString -String "ChangeMe!" -Force -AsPlainText
+$pfx = Join-Path $PSScriptRoot "nexcode-dev.pfx"
 Export-PfxCertificate `
   -Cert "Cert:\CurrentUser\My\$($cert.Thumbprint)" `
-  -FilePath ".\nexcode-dev.pfx" `
+  -FilePath $pfx `
   -Password $pwd
 
-# Trust it on this machine so sideload installs work:
-Import-PfxCertificate -FilePath ".\nexcode-dev.pfx" -CertStoreLocation Cert:\LocalMachine\TrustedPeople -Password $pwd
+Write-Host "Wrote $pfx (thumbprint $($cert.Thumbprint))"
+
+# 3) Trust it on THIS machine so Add-AppxPackage / sideload installs work.
+#    Run this part from an ELEVATED PowerShell (Start as Administrator).
+Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\LocalMachine\TrustedPeople -Password $pwd
 ```
 
-The `Subject` must exactly match the `<Identity Publisher="...">` value in `src/NexCode.Gui/Package.appxmanifest` or the MSIX won't install.
+The exported `.pfx` is gitignored (`*.pfx` rule in `.gitignore`). Don't commit it.
 
 ### Option B — Commercial CA (non-Store distribution)
 
@@ -248,12 +263,14 @@ For each row in the table, in Partner Center → your app → **Add-ons** → **
 
 | Product ID | Display name | Subscription period | Free trial | Suggested USD |
 |---|---|---|---|---|
-| `nexcode_pro_monthly` | NexCode Pro (Monthly) | 1 month | 7 days | $19.99 |
-| `nexcode_pro_annual` | NexCode Pro (Annual) | 1 year | 7 days | $199.99 |
-| `nexcode_team_monthly` | NexCode Team (Monthly) | 1 month | none | $39.99 |
-| `nexcode_team_annual` | NexCode Team (Annual) | 1 year | none | $399.99 |
-| `nexcode_enterprise_monthly` | NexCode Enterprise (Monthly) | 1 month | none | $99.99 |
-| `nexcode_enterprise_annual` | NexCode Enterprise (Annual) | 1 year | none | $999.99 |
+| `nexcode_pro_monthly` | NexCode Pro (Monthly) | 1 month | 7 days | $0.99 |
+| `nexcode_pro_annual` | NexCode Pro (Annual) | 1 year | 7 days | $9.99 |
+| `nexcode_team_monthly` | NexCode Team (Monthly) | 1 month | none | $1.49 |
+| `nexcode_team_annual` | NexCode Team (Annual) | 1 year | none | $14.99 |
+| `nexcode_enterprise_monthly` | NexCode Enterprise (Monthly per user) | 1 month | none | $1.99 |
+| `nexcode_enterprise_annual` | NexCode Enterprise (Annual per user) | 1 year | none | $19.99 |
+
+**Note on the Enterprise tier:** the display name says "per user" because that's how the seat math works — the Enterprise license auth flow validates one user, and you scale by buying multiple subscriptions in Partner Center (an admin distributes seats inside the org). The Store doesn't enforce seat counts, so the per-user wording sets expectations rather than billing logic.
 
 For each add-on:
 
@@ -681,6 +698,37 @@ dotnet test NexCode.slnx
 
 Expected: `Passed: 219, Failed: 0, Skipped: 0`.
 
+### Visual Studio multi-project startup (debugging the full stack)
+
+NexCode runs as **two cooperating processes**: the helper (`NexCode.Service`) and the GUI (`NexCode.Gui`). To F5-debug both at once:
+
+1. In Solution Explorer, right-click the **solution** → **Configure Startup Projects…**
+2. Pick **Multiple startup projects**.
+3. Set the **Action** column:
+
+| Project | Action |
+|---|---|
+| `NexCode.Service` | **Start** |
+| `NexCode.Gui` | **Start** |
+| All others (`NexCode.Cli`, `NexCode.Data`, `NexCode.Remote`, `NexCode.Shared`, `NexCode.Marketplace.Sdk`, every test project) | **None** |
+
+4. Click **Apply** then **OK**. The startup config is written to `.vs/<sln>/v17/.suo`, which is in `.gitignore`, so each developer keeps their own.
+5. Press **F5**. Visual Studio launches the helper first (it owns the named pipe), then the GUI which connects to it.
+
+If the GUI starts before the helper is fully listening, you'll see the *"Helper not running"* banner for ~1 second; the GUI auto-reconnects on the next IPC poll (default 1s).
+
+### CLI-only smoke test (no GUI)
+
+```powershell
+# Terminal 1 — helper
+dotnet run --project src/NexCode.Service
+
+# Terminal 2 — CLI
+dotnet run --project src/NexCode.Cli -- service ping
+dotnet run --project src/NexCode.Cli -- account status
+dotnet run --project src/NexCode.Cli -- session create --project (Get-Location).Path
+```
+
 ---
 
 ## 13. Provider configuration (first-run UX)
@@ -958,6 +1006,46 @@ dotnet run --project src/NexCode.Service
 ### "No AI provider is configured"
 
 You haven't completed [§13](#13-provider-configuration-first-run-ux). Settings → Providers → add a provider with a real API key.
+
+### Visual Studio: "Shared Web Components did not load correctly"
+
+This is a VS 2022 / VS 2026 component-cache or workload mismatch. It does **not** indicate a problem with the NexCode codebase — the .slnx still loads, but pages that depend on Shared Web Components (the Razor / web tooling stack that some MSIX previews use) fail to render their designer surface. Three fixes in escalating cost:
+
+1. **Update the workloads first.** Open **Visual Studio Installer** → **Modify** for your VS instance → **Workloads** tab → ensure all three of these are checked, then **Modify**:
+   - **.NET desktop development**
+   - **Universal Windows Platform development**
+   - **ASP.NET and web development** (this is the one that ships Shared Web Components)
+   - Under **Individual components**, also tick **Windows App SDK C# Templates** if it isn't already.
+2. **Reset VS user data.** Close VS, then in PowerShell:
+   ```powershell
+   & "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\devenv.exe" /resetuserdata
+   # (or wherever your VS install lives — Community / Professional / 2026 Preview)
+   ```
+   Reopen VS. This wipes per-user caches without touching the install.
+3. **Repair the install.** **Visual Studio Installer** → **More** → **Repair**. Takes 10–15 min. Use this if Step 2 didn't help.
+
+You don't need to read the `ActivityLog.xml` — the message you're seeing covers the full diagnosis. If after Step 3 it still fails, file an issue at <https://developercommunity.visualstudio.com/>.
+
+### CI / CodeQL fails with NETSDK1094 ("a valid runtime package was not found")
+
+GitHub Actions runners come with `dotnet 10.0.x` preinstalled, which our `global.json` (see [§2](#2-resolving-the-xamlcompilerexe-pass2-build-break)) pins down to 9.0.305. That alone fixes the XAML compiler issue locally, but two CI workflows (`build` step in `ci.yml` and `codeql.yml`) trigger NETSDK1094 because **PublishReadyToRun** was set to `True` for non-Debug configurations and R2R requires a runtime package matching the target RID at the moment the publish target runs.
+
+**Fix already applied** in `src/NexCode.Gui/NexCode.Gui.csproj`:
+
+```xml
+<PropertyGroup>
+  <PublishReadyToRun>False</PublishReadyToRun>
+  <PublishTrimmed>False</PublishTrimmed>
+</PropertyGroup>
+```
+
+R2R is a startup-perf optimization (~5% on cold start). If you want it back later, re-enable per-publish via:
+
+```bash
+dotnet publish src/NexCode.Gui -c Release -r win-x64 --self-contained -p:PublishReadyToRun=true
+```
+
+— always with an explicit `-r` flag so the SDK can find the matching runtime pack. Push a tag and the next CI run will go green.
 
 ### WinAppSDK XamlCompiler 0-byte g.cs
 

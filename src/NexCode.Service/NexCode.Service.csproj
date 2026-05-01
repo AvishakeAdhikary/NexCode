@@ -37,5 +37,14 @@
     <None Include="Marketplace\Fixtures\catalog.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!--
+      appsettings.Local.json is gitignored. When a developer creates one locally, MSBuild
+      copies it into bin/ so the Host.CreateApplicationBuilder pipeline picks it up at runtime.
+      The Condition prevents the build from failing when the file is absent (which is the
+      default state in CI / fresh clones).
+    -->
+    <None Include="appsettings.Local.json" Condition="Exists('appsettings.Local.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

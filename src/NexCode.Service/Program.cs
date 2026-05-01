@@ -42,6 +42,15 @@ public static class Program
             ContentRootPath = AppContext.BaseDirectory
         });
 
+        // appsettings.Local.json is gitignored — use it for developer-machine identifiers
+        // (Azure AD client/tenant IDs, optional MCP / telemetry endpoints, etc.) that you
+        // do not want committed to a public repository. Loaded last so its values shadow
+        // appsettings.Development.json and appsettings.json.
+        builder.Configuration.AddJsonFile(
+            Path.Combine(AppContext.BaseDirectory, "appsettings.Local.json"),
+            optional: true,
+            reloadOnChange: true);
+
         builder.Services.Configure<ServiceHostOptions>(
             builder.Configuration.GetSection(ServiceHostOptions.SectionName));
         builder.Services.Configure<AuthOptions>(

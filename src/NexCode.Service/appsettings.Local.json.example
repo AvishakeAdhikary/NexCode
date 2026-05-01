@@ -1,0 +1,17 @@
+{
+  "_comment": [
+    "Copy this file to 'appsettings.Local.json' (same folder) and fill in your values.",
+    "appsettings.Local.json is gitignored — safe for developer-machine identifiers.",
+    "It is loaded after appsettings.Development.json so its keys override.",
+    "",
+    "Note: Azure AD Application (client) ID and Tenant ID are PUBLIC identifiers — they",
+    "are exposed by the .well-known/openid-configuration endpoint of any AAD tenant. They",
+    "are NOT secrets and could be committed to a public repo without harm. We keep them",
+    "in this gitignored file only to keep dev-environment specifics off the main branch."
+  ],
+  "Auth": {
+    "ClientId": "00000000-0000-0000-0000-000000000000",
+    "TenantId": "common",
+    "RedirectUri": "https://login.microsoftonline.com/common/oauth2/nativeclient"
+  }
+}

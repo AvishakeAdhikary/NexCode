@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -9,15 +9,15 @@
   IgnorableNamespaces="uap rescap systemai">
 
   <Identity
-    Name="3BA62258-C473-4F0C-9446-60AA27532BA2"
-    Publisher="CN=NexCodeDev"
+    Name="NeuralNexusStudios.NexCode"
+    Publisher="CN=8559855F-6955-4418-A6D8-835C3238CF34"
     Version="1.0.0.0" />
 
-  <mp:PhoneIdentity PhoneProductId="3BA62258-C473-4F0C-9446-60AA27532BA2" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="9NG8M7H1DC3J" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>NexCode.Gui</DisplayName>
-    <PublisherDisplayName>NexCode Dev</PublisherDisplayName>
+    <DisplayName>NexCode</DisplayName>
+    <PublisherDisplayName>Neural Nexus Studios</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -35,8 +35,8 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="NexCode.Gui"
-        Description="NexCode.Gui"
+        DisplayName="NexCode"
+        Description="NexCode — agentic AI coding platform"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">

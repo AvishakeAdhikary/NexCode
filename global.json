@@ -1,0 +1,14 @@
+{
+  "_comment": [
+    "rollForward 'latestMajor' accepts any installed SDK at or above the floor.",
+    "If you ever hit the WinAppSDK 2.0.x XamlCompiler Pass2 silent-exit-1 regression",
+    "(see docs/manual-completion-guide.md §2), tighten this to a 9.0.x pin like:",
+    "  { \"sdk\": { \"version\": \"9.0.305\", \"rollForward\": \"feature\" } }",
+    "and install that SDK from https://dotnet.microsoft.com/download/dotnet/9.0"
+  ],
+  "sdk": {
+    "version": "9.0.100",
+    "rollForward": "latestMajor",
+    "allowPrerelease": false
+  }
+}
