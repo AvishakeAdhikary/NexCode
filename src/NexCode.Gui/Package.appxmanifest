@@ -13,7 +13,7 @@
     Publisher="CN=8559855F-6955-4418-A6D8-835C3238CF34"
     Version="1.0.0.0" />
 
-  <mp:PhoneIdentity PhoneProductId="9NG8M7H1DC3J" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="00000000-0000-0000-0000-000000000000" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>NexCode</DisplayName>
