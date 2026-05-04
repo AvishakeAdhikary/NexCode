@@ -71,46 +71,70 @@ public sealed class PipeServerBackgroundService(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await using var pipe = new NamedPipeServerStream(
-                options.Value.PipeName,
-                PipeDirection.InOut,
-                NamedPipeServerStream.MaxAllowedServerInstances,
-                PipeTransmissionMode.Byte,
-                PipeOptions.Asynchronous);
+            try
+            {
+                await using var pipe = new NamedPipeServerStream(
+                    options.Value.PipeName,
+                    PipeDirection.InOut,
+                    NamedPipeServerStream.MaxAllowedServerInstances,
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous);
 
-            await pipe.WaitForConnectionAsync(stoppingToken);
-            await HandleConnectionAsync(pipe, stoppingToken);
+                await pipe.WaitForConnectionAsync(stoppingToken);
+                await HandleConnectionAsync(pipe, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // Host is shutting down — exit the loop cleanly.
+                break;
+            }
+            catch (Exception ex)
+            {
+                // A misbehaving client (early disconnect, malformed JSON, dispose-time flush failure, etc.)
+                // must NOT take down the helper. Log and resume listening.
+                logger.LogWarning(ex, "Pipe connection ended with an unhandled exception; resuming.");
+            }
         }
     }
 
     private async Task HandleConnectionAsync(Stream stream, CancellationToken cancellationToken)
     {
-        using var reader = new StreamReader(stream);
-        await using var writer = new StreamWriter(stream) { AutoFlush = true };
-
-        var requestLine = await reader.ReadLineAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(requestLine))
-        {
-            return;
-        }
-
-        JsonRpcResponse response;
-
         try
         {
-            var request = JsonSerializer.Deserialize<JsonRpcRequest>(requestLine, JsonSerialization.Options)
-                ?? throw new InvalidOperationException("Request payload was empty.");
+            using var reader = new StreamReader(stream);
+            await using var writer = new StreamWriter(stream) { AutoFlush = true };
 
-            response = await HandleRequestAsync(request, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to process named pipe request.");
-            response = JsonRpcResponse.Failure(null, -32603, ex.Message);
-        }
+            var requestLine = await reader.ReadLineAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(requestLine))
+            {
+                return;
+            }
 
-        var responseJson = JsonSerializer.Serialize(response, JsonSerialization.Options);
-        await writer.WriteLineAsync(responseJson);
+            JsonRpcResponse response;
+
+            try
+            {
+                var request = JsonSerializer.Deserialize<JsonRpcRequest>(requestLine, JsonSerialization.Options)
+                    ?? throw new InvalidOperationException("Request payload was empty.");
+
+                response = await HandleRequestAsync(request, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to process named pipe request.");
+                response = JsonRpcResponse.Failure(null, -32603, ex.Message);
+            }
+
+            var responseJson = JsonSerializer.Serialize(response, JsonSerialization.Options);
+            try
+            {
+                await writer.WriteLineAsync(responseJson);
+            }
+            catch (IOException) { /* client went away mid-write — drop the response */ }
+            catch (ObjectDisposedException) { /* same */ }
+        }
+        catch (IOException) { /* peer closed the pipe before we read anything */ }
+        catch (ObjectDisposedException) { /* same */ }
     }
 
     private async Task<JsonRpcResponse> HandleRequestAsync(JsonRpcRequest request, CancellationToken cancellationToken)
