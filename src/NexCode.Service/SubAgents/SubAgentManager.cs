@@ -102,12 +102,9 @@ public sealed class SubAgentManager
 
     public async Task<SubAgentKillResponse> KillAsync(Guid subAgentId, CancellationToken cancellationToken)
     {
-        var killed = false;
-        if (_live.TryRemove(subAgentId, out var child))
-        {
-            killed = child.TryKill();
-        }
-
+        // Persist "killed" to the DB before signalling the process so that the background
+        // MonitorChildAsync/OnChildExitAsync task sees EndedAt != null and skips its own
+        // status write, preventing a race where it overwrites "killed" with "failed".
         await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var entity = await db.SubAgents.FirstOrDefaultAsync(x => x.Id == subAgentId, cancellationToken).ConfigureAwait(false);
         if (entity is not null && entity.EndedAt is null)
@@ -119,6 +116,12 @@ public sealed class SubAgentManager
             _eventHub.Publish(
                 ServiceEventTypes.AgentEnded,
                 new AgentEndedEventPayload(entity.Id, entity.ParentSessionId, SubAgentStatuses.Killed, null, null));
+        }
+
+        var killed = false;
+        if (_live.TryRemove(subAgentId, out var child))
+        {
+            killed = child.TryKill();
         }
 
         return new SubAgentKillResponse(subAgentId, killed);
