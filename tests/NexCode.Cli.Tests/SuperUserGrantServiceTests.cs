@@ -17,7 +17,7 @@ public sealed class SuperUserGrantServiceTests
     {
         using var rsa = RSA.Create(2048);
         var email = "privileged@example.test";
-        var issuedAt = DateTimeOffset.Parse("2026-04-19T00:00:00Z");
+        var issuedAt = DateTimeOffset.UtcNow;
         var grantFileName = $"test-superuser-{Guid.NewGuid():N}.grant";
         var options = Options.Create(new SuperUserGrantOptions
         {
