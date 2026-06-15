@@ -65,15 +65,33 @@ public sealed class PipeServerBackgroundService(
 {
     private const int SubscriptionGateRequiredError = -32021;
 
+    // The GUI keeps several requests in flight at once (a 2-second event poll plus
+    // health / account-snapshot / sign-in calls). A serial accept loop that handled
+    // one connection to completion before listening again left *no* pipe waiting
+    // while a slow handler ran (e.g. a Store-backed account snapshot), so the
+    // client's short connect timeout would fail and the GUI would flicker into a
+    // spurious "Helper unavailable" state. We therefore serve each accepted client
+    // on its own task and immediately loop back to accept the next one, bounded by
+    // this many concurrent handlers.
+    private const int MaxConcurrentConnections = 16;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("NexCode helper service listening on pipe {PipeName}", options.Value.PipeName);
 
+        using var connectionSlots = new SemaphoreSlim(MaxConcurrentConnections, MaxConcurrentConnections);
+        var inFlight = new List<Task>();
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            var acquired = false;
+            NamedPipeServerStream? pipe = null;
             try
             {
-                await using var pipe = new NamedPipeServerStream(
+                await connectionSlots.WaitAsync(stoppingToken);
+                acquired = true;
+
+                pipe = new NamedPipeServerStream(
                     options.Value.PipeName,
                     PipeDirection.InOut,
                     NamedPipeServerStream.MaxAllowedServerInstances,
@@ -81,19 +99,73 @@ public sealed class PipeServerBackgroundService(
                     PipeOptions.Asynchronous);
 
                 await pipe.WaitForConnectionAsync(stoppingToken);
-                await HandleConnectionAsync(pipe, stoppingToken);
+
+                // Hand this client off to its own task; ownership of the pipe and the
+                // concurrency slot transfers to ServeConnectionAsync, which releases
+                // both when the exchange completes. Loop back immediately so a fresh
+                // listener is always waiting for the next connection.
+                inFlight.Add(ServeConnectionAsync(pipe, connectionSlots, stoppingToken));
+                inFlight.RemoveAll(static t => t.IsCompleted);
+                pipe = null;
+                acquired = false;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 // Host is shutting down — exit the loop cleanly.
+                if (pipe is not null)
+                {
+                    await pipe.DisposeAsync();
+                }
+                if (acquired)
+                {
+                    connectionSlots.Release();
+                }
                 break;
             }
             catch (Exception ex)
             {
-                // A misbehaving client (early disconnect, malformed JSON, dispose-time flush failure, etc.)
-                // must NOT take down the helper. Log and resume listening.
-                logger.LogWarning(ex, "Pipe connection ended with an unhandled exception; resuming.");
+                // Failing to accept one connection must NOT take down the helper.
+                logger.LogWarning(ex, "Pipe listener failed to accept a connection; resuming.");
+                if (pipe is not null)
+                {
+                    await pipe.DisposeAsync();
+                }
+                if (acquired)
+                {
+                    connectionSlots.Release();
+                }
             }
+        }
+
+        try
+        {
+            await Task.WhenAll(inFlight);
+        }
+        catch
+        {
+            // Individual handler failures are already logged inside ServeConnectionAsync.
+        }
+    }
+
+    private async Task ServeConnectionAsync(
+        NamedPipeServerStream pipe,
+        SemaphoreSlim connectionSlots,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await HandleConnectionAsync(pipe, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // A misbehaving client (early disconnect, malformed JSON, dispose-time flush failure, etc.)
+            // must NOT take down the helper. Log and let the slot free up.
+            logger.LogWarning(ex, "Pipe connection ended with an unhandled exception.");
+        }
+        finally
+        {
+            await pipe.DisposeAsync();
+            connectionSlots.Release();
         }
     }
 

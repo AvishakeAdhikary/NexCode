@@ -9,6 +9,8 @@ public sealed partial class AuthGateOverlay : UserControl
     public event EventHandler? SignInRequested;
     public event EventHandler? RefreshRequested;
 
+    private bool _wasVisible;
+
     public AuthGateOverlay()
     {
         InitializeComponent();
@@ -38,10 +40,16 @@ public sealed partial class AuthGateOverlay : UserControl
         SignInButton.IsEnabled = presentation.IsSignInEnabled;
         SignInButton.Content = presentation.SignInButtonLabel;
         Visibility = presentation.IsOverlayVisible ? Visibility.Visible : Visibility.Collapsed;
-        if (presentation.IsOverlayVisible)
+
+        // Only play the fade-in on the hidden -> visible transition. The auth gate
+        // presentation is re-applied on every 2-second event poll; restarting the
+        // storyboard each time made the overlay pulse/flicker while it stayed open.
+        if (presentation.IsOverlayVisible && !_wasVisible)
         {
             FadeInStoryboard.Begin();
         }
+
+        _wasVisible = presentation.IsOverlayVisible;
     }
 
     private void SignIn_Click(object sender, RoutedEventArgs e) => SignInRequested?.Invoke(this, EventArgs.Empty);

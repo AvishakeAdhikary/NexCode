@@ -10,6 +10,13 @@ public sealed class HelperControlClient
 {
     private const string PipeName = "nexcode-service-dev";
 
+    // The helper serves connections concurrently, so a connect normally succeeds
+    // immediately. These values only matter in the rare window where every server
+    // instance is momentarily busy: give each attempt enough time and retry a few
+    // times with a short backoff rather than failing fast into "Helper unavailable".
+    private const int ConnectTimeoutMilliseconds = 1500;
+    private const int MaxConnectAttempts = 3;
+
     public Task<ServiceHealthPayload> GetHealthAsync(CancellationToken cancellationToken = default)
     {
         return SendRequestAsync<ServiceHealthPayload>(IpcMethods.ServiceHealth, cancellationToken);
@@ -66,6 +73,36 @@ public sealed class HelperControlClient
             cancellationToken);
     }
 
+    private static async Task<NamedPipeClientStream> ConnectAsync(CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var client = new NamedPipeClientStream(
+                ".",
+                PipeName,
+                PipeDirection.InOut,
+                PipeOptions.Asynchronous);
+
+            try
+            {
+                await client.ConnectAsync(ConnectTimeoutMilliseconds, cancellationToken);
+                return client;
+            }
+            catch (Exception ex) when (attempt < MaxConnectAttempts && ex is TimeoutException or IOException)
+            {
+                // Every server instance was momentarily busy. Back off briefly and retry
+                // before surfacing the failure as "Helper unavailable".
+                await client.DisposeAsync();
+                await Task.Delay(150 * attempt, cancellationToken);
+            }
+            catch
+            {
+                await client.DisposeAsync();
+                throw;
+            }
+        }
+    }
+
     private static async Task<TPayload> SendRequestAsync<TPayload>(string method, CancellationToken cancellationToken)
     {
         return await SendRequestAsync<TPayload>(method, new { }, cancellationToken);
@@ -76,13 +113,7 @@ public sealed class HelperControlClient
         object payload,
         CancellationToken cancellationToken)
     {
-        await using var client = new NamedPipeClientStream(
-            ".",
-            PipeName,
-            PipeDirection.InOut,
-            PipeOptions.Asynchronous);
-
-        await client.ConnectAsync(750, cancellationToken);
+        await using var client = await ConnectAsync(cancellationToken);
 
         using var reader = new StreamReader(client);
         await using var writer = new StreamWriter(client) { AutoFlush = true };
