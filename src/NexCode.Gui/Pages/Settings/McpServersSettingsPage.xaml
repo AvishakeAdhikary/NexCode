@@ -99,7 +99,10 @@
                             <ComboBoxItem Content="websocket" />
                         </ComboBox>
                         <TextBox Header="Command" Text="{Binding Command, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <ToggleSwitch Header="Enabled" IsOn="{Binding IsEnabled, Mode=TwoWay}" />
+                        <ToggleSwitch
+                            Header="Enabled"
+                            IsOn="{Binding IsEnabled, Mode=TwoWay}"
+                            Toggled="EnabledToggle_Toggled" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Click="OpenManifest_Click" Content="Edit manifest JSON" />
                             <Button

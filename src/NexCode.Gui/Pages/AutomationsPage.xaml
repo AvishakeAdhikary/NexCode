@@ -91,12 +91,10 @@
                             CornerRadius="10">
                             <StackPanel Spacing="6">
                                 <TextBlock FontWeight="SemiBold" Text="Trigger" />
-                                <ComboBox Header="Trigger type" SelectedIndex="0">
-                                    <ComboBoxItem Content="manual" />
-                                    <ComboBoxItem Content="cron" />
-                                    <ComboBoxItem Content="file-watch" />
-                                    <ComboBoxItem Content="hook" />
-                                </ComboBox>
+                                <ComboBox
+                                    Header="Trigger type"
+                                    ItemsSource="{x:Bind ViewModel.TriggerTypeOptions}"
+                                    SelectedItem="{Binding TriggerSummary, Mode=TwoWay}" />
                                 <TextBox Header="Cron / pattern" Text="{Binding ScheduleCron, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                         </Border>
@@ -110,7 +108,7 @@
                             <StackPanel Spacing="6">
                                 <TextBlock FontWeight="SemiBold" Text="Steps" />
                                 <ListView Height="180">
-                                    <ListViewItem Content="Add steps via the structured editor (slice 0017 wire-up)." IsHitTestVisible="False" />
+                                    <ListViewItem Content="Steps are edited as raw JSON; the structured step builder is not available on this view." IsHitTestVisible="False" />
                                 </ListView>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button Content="Add step" />
@@ -119,7 +117,15 @@
                             </StackPanel>
                         </Border>
 
-                        <ToggleSwitch Header="Enabled" IsOn="{Binding IsEnabled, Mode=TwoWay}" />
+                        <ToggleSwitch
+                            Header="Enabled"
+                            IsOn="{Binding IsEnabled, Mode=TwoWay}"
+                            Toggled="EnabledToggle_Toggled" />
+
+                        <Button
+                            Click="Save_Click"
+                            Content="Save automation"
+                            HorizontalAlignment="Right" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>

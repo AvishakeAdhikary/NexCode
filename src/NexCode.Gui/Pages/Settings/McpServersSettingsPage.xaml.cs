@@ -1,10 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using NexCode.Gui.Services;
 using NexCode.Gui.ViewModels.Pages;
 
 namespace NexCode.Gui.Pages.Settings;
 
-/// <summary>MCP server registry panel (spec §32 — slice 0016 wire-up pending).</summary>
+/// <summary>MCP server registry panel (spec §17). Backed by the helper over <c>mcp.*</c>.</summary>
 public sealed partial class McpServersSettingsPage : Page
 {
     public McpSettingsViewModel ViewModel { get; } = new();
@@ -13,6 +15,23 @@ public sealed partial class McpServersSettingsPage : Page
     {
         InitializeComponent();
         DataContext = ViewModel;
+        Loaded += OnLoaded;
+    }
+
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        var client = ((App)Application.Current).Services.GetRequiredService<HelperControlClient>();
+        await ViewModel.InitializeAsync(client);
+    }
+
+    private async void EnabledToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        // IsLoaded is false while the detail panel is binding a freshly selected/loaded row, so
+        // this only fires for genuine user interaction rather than the initial value push.
+        if (sender is ToggleSwitch { IsLoaded: true } toggle && toggle.DataContext is McpServerRowViewModel row)
+        {
+            await ViewModel.ToggleAsync(row, toggle.IsOn);
+        }
     }
 
     private async void OpenManifest_Click(object sender, RoutedEventArgs e)
@@ -34,11 +53,11 @@ public sealed partial class McpServersSettingsPage : Page
         };
 
         sheet.Closed += (_, _) => dialog.Hide();
-        sheet.Saved += (_, json) =>
+        sheet.Saved += async (_, json) =>
         {
             row.ManifestJson = json;
-            ViewModel.StatusMessage = $"Saved manifest for {row.Name} (in-memory; helper sync pending).";
             dialog.Hide();
+            await ViewModel.SaveAsync(row);
         };
 
         await dialog.ShowAsync();

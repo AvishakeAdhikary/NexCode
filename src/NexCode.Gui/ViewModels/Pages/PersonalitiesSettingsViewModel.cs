@@ -2,13 +2,15 @@ using System;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NexCode.Gui.Services;
 using NexCode.Shared.Contracts;
 
 namespace NexCode.Gui.ViewModels.Pages;
 
 /// <summary>
 /// VM for <see cref="Gui.Pages.Settings.PersonalitiesSettingsPage"/>. Spec §8.2 — personalities
-/// stack on top of the active mode and can be scoped global or to a single project.
+/// stack on top of the active mode and can be scoped global or to a single project. List, upsert
+/// and delete are backed by the helper over <c>personality.list/upsert/delete</c>.
 /// </summary>
 public sealed partial class PersonalitiesSettingsViewModel : ObservableObject
 {
@@ -26,12 +28,76 @@ public sealed partial class PersonalitiesSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMessage = "Personalities load lazily on first activation.";
 
+    [ObservableProperty]
+    private bool _isBusy;
+
+    private HelperControlClient? _client;
+
+    /// <summary>Called by the page on activation: binds the helper transport and loads the list.</summary>
+    public async Task InitializeAsync(HelperControlClient client)
+    {
+        _client = client;
+        await LoadAsync();
+    }
+
     [RelayCommand]
-    private void AddPersonality()
+    private async Task Reload() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var response = await _client.ListPersonalitiesAsync();
+            ApplyListResponse(response);
+            StatusMessage = $"Loaded {Personalities.Count} personality(ies).";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not load personalities: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>Persists the given row through <c>personality.upsert</c> and reloads.</summary>
+    private async Task SaveAsync(PersonalityRowViewModel row)
+    {
+        if (_client is null)
+        {
+            StatusMessage = "Helper unavailable; cannot save.";
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            await _client.UpsertPersonalityAsync(row.ToUpsertRequest());
+            await LoadAsync();
+            StatusMessage = $"Saved {row.Name}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Save failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task AddPersonality()
     {
         var row = new PersonalityRowViewModel
         {
-            Id = Guid.NewGuid(),
             Name = "New personality",
             Description = string.Empty,
             SystemPromptFragment = string.Empty,
@@ -41,10 +107,11 @@ public sealed partial class PersonalitiesSettingsViewModel : ObservableObject
         };
         Personalities.Add(row);
         SelectedPersonality = row;
+        await SaveAsync(row);
     }
 
     [RelayCommand]
-    private void DuplicatePersonality(PersonalityRowViewModel? row)
+    private async Task DuplicatePersonality(PersonalityRowViewModel? row)
     {
         if (row is null)
         {
@@ -53,7 +120,6 @@ public sealed partial class PersonalitiesSettingsViewModel : ObservableObject
 
         var clone = new PersonalityRowViewModel
         {
-            Id = Guid.NewGuid(),
             Name = $"{row.Name} (copy)",
             Description = row.Description,
             SystemPromptFragment = row.SystemPromptFragment,
@@ -65,26 +131,52 @@ public sealed partial class PersonalitiesSettingsViewModel : ObservableObject
         };
         Personalities.Add(clone);
         SelectedPersonality = clone;
+        await SaveAsync(clone);
     }
 
     [RelayCommand]
-    private void DeletePersonality(PersonalityRowViewModel? row)
+    private async Task DeletePersonality(PersonalityRowViewModel? row)
     {
+        row ??= SelectedPersonality;
         if (row is null)
         {
             return;
         }
 
-        Personalities.Remove(row);
-        if (SelectedPersonality == row)
+        if (_client is null)
         {
-            SelectedPersonality = null;
+            Personalities.Remove(row);
+            if (SelectedPersonality == row)
+            {
+                SelectedPersonality = null;
+            }
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            if (row.Id != Guid.Empty)
+            {
+                await _client.DeletePersonalityAsync(row.Id);
+            }
+            await LoadAsync();
+            StatusMessage = $"Deleted {row.Name}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Delete failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
     [RelayCommand]
-    private void SetDefault(PersonalityRowViewModel? row)
+    private async Task SetDefault(PersonalityRowViewModel? row)
     {
+        row ??= SelectedPersonality;
         if (row is null)
         {
             return;
@@ -96,7 +188,8 @@ public sealed partial class PersonalitiesSettingsViewModel : ObservableObject
         }
 
         row.IsDefault = true;
-        StatusMessage = $"Default personality set to {row.Name} (wire-up pending).";
+        await SaveAsync(row);
+        StatusMessage = $"Default personality set to {row.Name}.";
     }
 
     public void ApplyListResponse(PersonalityListResponse response)

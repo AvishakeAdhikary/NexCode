@@ -1,6 +1,8 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using NexCode.Gui.Services;
 using NexCode.Gui.ViewModels.Pages;
 
 namespace NexCode.Gui.Pages.Settings;
@@ -14,6 +16,13 @@ public sealed partial class ModesSettingsPage : Page
     {
         InitializeComponent();
         DataContext = ViewModel;
+        Loaded += OnLoaded;
+    }
+
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        var client = ((App)Application.Current).Services.GetRequiredService<HelperControlClient>();
+        await ViewModel.InitializeAsync(client);
     }
 
     private async void OpenJsonEditor_Click(object sender, RoutedEventArgs e)
@@ -36,10 +45,10 @@ public sealed partial class ModesSettingsPage : Page
         };
 
         sheet.Closed += (_, _) => dialog.Hide();
-        sheet.Saved += (_, _) =>
+        sheet.Saved += async (_, json) =>
         {
-            ViewModel.StatusMessage = "Mode JSON saved (in-memory; helper sync wire-up pending).";
             dialog.Hide();
+            await ViewModel.ApplyEditedJsonAsync(row, json);
         };
 
         await dialog.ShowAsync();
