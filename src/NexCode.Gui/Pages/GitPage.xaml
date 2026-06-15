@@ -19,20 +19,28 @@
 
         <Grid ColumnSpacing="12">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel>
+            <StackPanel VerticalAlignment="Center">
                 <TextBlock FontSize="20" FontWeight="SemiBold" Text="Git Manager" />
                 <TextBlock Text="{Binding CurrentBranch}" Opacity="0.72" />
             </StackPanel>
-            <Button Grid.Column="1" Content="Refresh" Command="{Binding RefreshCommand}" />
-            <Button Grid.Column="2" Content="Fetch" Command="{Binding FetchCommand}" />
-            <Button Grid.Column="3" Content="Pull" Command="{Binding PullCommand}" />
-            <Button Grid.Column="4" Content="Push" Command="{Binding PushCommand}" />
+            <TextBox
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                PlaceholderText="Project path"
+                Text="{Binding ProjectPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            <Button Grid.Column="2" Content="Refresh" Command="{Binding RefreshCommand}" />
+            <Button Grid.Column="3" Content="Diff" Command="{Binding DiffCommand}" />
+            <Button Grid.Column="4" Content="Fetch" Command="{Binding FetchCommand}" IsEnabled="False" />
+            <Button Grid.Column="5" Content="Pull" Command="{Binding PullCommand}" IsEnabled="False" />
+            <Button Grid.Column="6" Content="Push" Command="{Binding PushCommand}" IsEnabled="False" />
         </Grid>
 
         <Grid Grid.Row="1" ColumnSpacing="12">
@@ -66,8 +74,9 @@
                         </ListView.ItemTemplate>
                     </ListView>
                     <StackPanel Grid.Row="2" Spacing="6">
-                        <TextBox PlaceholderText="Commit message" Text="{Binding CommitMessage, Mode=TwoWay}" AcceptsReturn="True" MinHeight="64" />
-                        <Button Content="Commit" Command="{Binding CommitCommand}" Style="{ThemeResource AccentButtonStyle}" />
+                        <TextBox PlaceholderText="Commit message" Text="{Binding CommitMessage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="64" IsEnabled="False" />
+                        <Button Content="Commit" Command="{Binding CommitCommand}" Style="{ThemeResource AccentButtonStyle}" IsEnabled="False" />
+                        <TextBlock Text="Commit, push, pull, fetch, branch, remote, stash, and tag have no backend handler yet." FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -93,10 +102,10 @@
                                 </ListView.ItemTemplate>
                             </ListView>
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Button Content="Create" Command="{Binding CreateBranchCommand}" />
-                                <Button Content="Switch" Command="{Binding SwitchBranchCommand}" />
-                                <Button Content="Merge" Command="{Binding MergeBranchCommand}" />
-                                <Button Content="Delete" Command="{Binding DeleteBranchCommand}" />
+                                <Button Content="Create" Command="{Binding CreateBranchCommand}" IsEnabled="False" />
+                                <Button Content="Switch" Command="{Binding SwitchBranchCommand}" IsEnabled="False" />
+                                <Button Content="Merge" Command="{Binding MergeBranchCommand}" IsEnabled="False" />
+                                <Button Content="Delete" Command="{Binding DeleteBranchCommand}" IsEnabled="False" />
                             </StackPanel>
                         </StackPanel>
                     </TabViewItem>
@@ -117,8 +126,8 @@
                                 </ListView.ItemTemplate>
                             </ListView>
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Button Content="Add" Command="{Binding AddRemoteCommand}" />
-                                <Button Content="Remove" Command="{Binding RemoveRemoteCommand}" />
+                                <Button Content="Add" Command="{Binding AddRemoteCommand}" IsEnabled="False" />
+                                <Button Content="Remove" Command="{Binding RemoveRemoteCommand}" IsEnabled="False" />
                             </StackPanel>
                         </StackPanel>
                     </TabViewItem>
@@ -126,9 +135,9 @@
                         <StackPanel Padding="6" Spacing="6">
                             <ListView ItemsSource="{Binding Stashes}" Height="180" />
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Button Content="Stash" Command="{Binding StashCreateCommand}" />
-                                <Button Content="Apply" Command="{Binding StashApplyCommand}" />
-                                <Button Content="Drop" Command="{Binding StashDropCommand}" />
+                                <Button Content="Stash" Command="{Binding StashCreateCommand}" IsEnabled="False" />
+                                <Button Content="Apply" Command="{Binding StashApplyCommand}" IsEnabled="False" />
+                                <Button Content="Drop" Command="{Binding StashDropCommand}" IsEnabled="False" />
                             </StackPanel>
                         </StackPanel>
                     </TabViewItem>
@@ -136,23 +145,33 @@
                         <StackPanel Padding="6" Spacing="6">
                             <ListView ItemsSource="{Binding Tags}" Height="180" />
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Button Content="Create" Command="{Binding TagCreateCommand}" />
-                                <Button Content="Push" Command="{Binding TagPushCommand}" />
-                                <Button Content="Delete" Command="{Binding TagDeleteCommand}" />
+                                <Button Content="Create" Command="{Binding TagCreateCommand}" IsEnabled="False" />
+                                <Button Content="Push" Command="{Binding TagPushCommand}" IsEnabled="False" />
+                                <Button Content="Delete" Command="{Binding TagDeleteCommand}" IsEnabled="False" />
                             </StackPanel>
                         </StackPanel>
                     </TabViewItem>
-                    <TabViewItem Header="Log" IsClosable="False">
-                        <ListView ItemsSource="{Binding LogEntries}" Height="240">
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="{Binding Message}" />
-                                        <TextBlock Text="{Binding Author}" Opacity="0.7" FontSize="12" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                    <TabViewItem Header="Diff" IsClosable="False">
+                        <ScrollViewer Height="240" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <TextBox
+                                Padding="6"
+                                FontFamily="Consolas"
+                                FontSize="12"
+                                IsReadOnly="True"
+                                AcceptsReturn="True"
+                                TextWrapping="NoWrap"
+                                Text="{Binding UnifiedDiff}" />
+                        </ScrollViewer>
+                    </TabViewItem>
+                    <TabViewItem Header="Revert" IsClosable="False">
+                        <StackPanel Padding="6" Spacing="6">
+                            <TextBlock Text="Revert the working tree to a checkpoint commit." Opacity="0.72" TextWrapping="Wrap" />
+                            <TextBox x:Name="RevertHashBox" PlaceholderText="Checkpoint commit hash" />
+                            <Button
+                                Content="Revert to checkpoint"
+                                Command="{Binding RevertCommitCommand}"
+                                CommandParameter="{Binding Text, ElementName=RevertHashBox}" />
+                        </StackPanel>
                     </TabViewItem>
                 </TabView>
             </Border>

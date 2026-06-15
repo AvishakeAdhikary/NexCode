@@ -3,17 +3,22 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NexCode.Gui.Services;
 
 namespace NexCode.Gui.ViewModels.Pages;
 
 /// <summary>
-/// Spec §16 Git Manager — observable state + commands consumed by GitPage.xaml. Wires
-/// the existing IPC methods (<c>git.status</c>, <c>git.diff</c>, <c>git.revert</c>) plus
-/// the future commit/branch/remote/stash/tag verbs declared in
-/// <see cref="GitExtraIpcMethods"/>.
+/// Spec §16 Git Manager — observable state + commands consumed by GitPage.xaml. Only the
+/// backend-supported verbs are wired: <c>git.status</c>, <c>git.diff</c>, and
+/// <c>git.revert</c> via <see cref="HelperControlClient"/>. Commit/push/pull/fetch/branch/
+/// remote/stash/tag have no service handler yet, so their commands report that they are
+/// unsupported rather than pretending to run.
 /// </summary>
 public sealed partial class GitPageViewModel : ObservableObject
 {
+    private const string DefaultProjectPath = @"C:\Projects\NexCode";
+    private const string NotSupportedMessage = "Not supported yet (no backend handler).";
+
     public ObservableCollection<GitFileEntryViewModel> WorkingTree { get; } = new();
     public ObservableCollection<GitBranchViewModel> Branches { get; } = new();
     public ObservableCollection<GitRemoteViewModel> Remotes { get; } = new();
@@ -22,7 +27,7 @@ public sealed partial class GitPageViewModel : ObservableObject
     public ObservableCollection<GitLogEntryViewModel> LogEntries { get; } = new();
 
     [ObservableProperty]
-    private string _projectPath = string.Empty;
+    private string _projectPath = DefaultProjectPath;
 
     [ObservableProperty]
     private string _currentBranch = "(unknown)";
@@ -34,12 +39,19 @@ public sealed partial class GitPageViewModel : ObservableObject
     private string _statusBanner = "Idle";
 
     [ObservableProperty]
+    private string _unifiedDiff = string.Empty;
+
+    [ObservableProperty]
     private bool _isBusy;
 
     [ObservableProperty]
     private double _progressValue;
 
+    private HelperControlClient? _client;
+
     public IRelayCommand RefreshCommand { get; }
+    public IRelayCommand DiffCommand { get; }
+    public IRelayCommand<string?> RevertCommitCommand { get; }
     public IRelayCommand CommitCommand { get; }
     public IRelayCommand PushCommand { get; }
     public IRelayCommand PullCommand { get; }
@@ -56,92 +68,144 @@ public sealed partial class GitPageViewModel : ObservableObject
     public IRelayCommand TagCreateCommand { get; }
     public IRelayCommand TagDeleteCommand { get; }
     public IRelayCommand TagPushCommand { get; }
-    public IRelayCommand RevertCommitCommand { get; }
 
     public GitPageViewModel()
     {
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
-        CommitCommand = new AsyncRelayCommand(CommitAsync);
-        PushCommand = new AsyncRelayCommand(() => RunIpcAsync(GitExtraIpcMethods.GitPush, "Pushing..."));
-        PullCommand = new AsyncRelayCommand(() => RunIpcAsync(GitExtraIpcMethods.GitPull, "Pulling..."));
-        FetchCommand = new AsyncRelayCommand(() => RunIpcAsync(GitExtraIpcMethods.GitFetch, "Fetching..."));
-        CreateBranchCommand = new AsyncRelayCommand<string?>(name => RunIpcAsync(GitExtraIpcMethods.GitBranch, $"Creating branch {name}..."));
-        SwitchBranchCommand = new AsyncRelayCommand<string?>(name => RunIpcAsync(GitExtraIpcMethods.GitBranch, $"Switching to {name}..."));
-        MergeBranchCommand = new AsyncRelayCommand<string?>(name => RunIpcAsync(GitExtraIpcMethods.GitBranch, $"Merging {name}..."));
-        DeleteBranchCommand = new AsyncRelayCommand<string?>(name => RunIpcAsync(GitExtraIpcMethods.GitBranch, $"Deleting {name}..."));
-        AddRemoteCommand = new AsyncRelayCommand<string?>(name => RunIpcAsync(GitExtraIpcMethods.GitRemote, $"Adding remote {name}..."));
-        RemoveRemoteCommand = new AsyncRelayCommand<string?>(name => RunIpcAsync(GitExtraIpcMethods.GitRemote, $"Removing remote {name}..."));
-        StashCreateCommand = new AsyncRelayCommand(() => RunIpcAsync(GitExtraIpcMethods.GitStash, "Stashing..."));
-        StashApplyCommand = new AsyncRelayCommand<string?>(_ => RunIpcAsync(GitExtraIpcMethods.GitStash, "Applying stash..."));
-        StashDropCommand = new AsyncRelayCommand<string?>(_ => RunIpcAsync(GitExtraIpcMethods.GitStash, "Dropping stash..."));
-        TagCreateCommand = new AsyncRelayCommand<string?>(name => RunIpcAsync(GitExtraIpcMethods.GitTag, $"Tagging {name}..."));
-        TagDeleteCommand = new AsyncRelayCommand<string?>(name => RunIpcAsync(GitExtraIpcMethods.GitTag, $"Deleting tag {name}..."));
-        TagPushCommand = new AsyncRelayCommand<string?>(name => RunIpcAsync(GitExtraIpcMethods.GitTag, $"Pushing tag {name}..."));
-        RevertCommitCommand = new AsyncRelayCommand<string?>(_ => RunIpcAsync("git.revert", "Reverting..."));
+        DiffCommand = new AsyncRelayCommand(DiffAsync);
+        RevertCommitCommand = new AsyncRelayCommand<string?>(RevertAsync);
+
+        // No service handler exists for these verbs yet. Keep them disabled and surface the
+        // reason instead of inventing IPC methods.
+        CommitCommand = new RelayCommand(MarkUnsupported, () => false);
+        PushCommand = new RelayCommand(MarkUnsupported, () => false);
+        PullCommand = new RelayCommand(MarkUnsupported, () => false);
+        FetchCommand = new RelayCommand(MarkUnsupported, () => false);
+        CreateBranchCommand = new RelayCommand(MarkUnsupported, () => false);
+        SwitchBranchCommand = new RelayCommand(MarkUnsupported, () => false);
+        MergeBranchCommand = new RelayCommand(MarkUnsupported, () => false);
+        DeleteBranchCommand = new RelayCommand(MarkUnsupported, () => false);
+        AddRemoteCommand = new RelayCommand(MarkUnsupported, () => false);
+        RemoveRemoteCommand = new RelayCommand(MarkUnsupported, () => false);
+        StashCreateCommand = new RelayCommand(MarkUnsupported, () => false);
+        StashApplyCommand = new RelayCommand(MarkUnsupported, () => false);
+        StashDropCommand = new RelayCommand(MarkUnsupported, () => false);
+        TagCreateCommand = new RelayCommand(MarkUnsupported, () => false);
+        TagDeleteCommand = new RelayCommand(MarkUnsupported, () => false);
+        TagPushCommand = new RelayCommand(MarkUnsupported, () => false);
     }
 
-    private Task RefreshAsync()
+    /// <summary>Called by the page on activation: binds the helper transport and refreshes.</summary>
+    public async Task InitializeAsync(HelperControlClient client)
     {
-        StatusBanner = "Refreshing repository state...";
-        IsBusy = true;
-        // Real implementation calls helper IPC: git.status, git.branch (list), etc.
-        // For Slice 0015 we leave the wire-up to MainWindow which already invokes
-        // git.status; this VM exposes the surfaces to bind to.
-        IsBusy = false;
-        StatusBanner = "Idle";
-        return Task.CompletedTask;
+        _client = client;
+        await RefreshAsync();
     }
 
-    private async Task CommitAsync()
+    private string EffectiveProjectPath =>
+        string.IsNullOrWhiteSpace(ProjectPath) ? DefaultProjectPath : ProjectPath;
+
+    private async Task RefreshAsync()
     {
-        if (string.IsNullOrWhiteSpace(CommitMessage))
+        if (_client is null)
         {
-            StatusBanner = "Enter a commit message.";
             return;
         }
-        await RunIpcAsync(GitExtraIpcMethods.GitCommit, "Committing...");
-        CommitMessage = string.Empty;
-    }
 
-    private async Task RunIpcAsync(string method, string label)
-    {
         IsBusy = true;
-        StatusBanner = label;
+        StatusBanner = "Refreshing repository state...";
         try
         {
-            // The actual HelperControlClient bindings live in the GUI shell. For Slice 0015
-            // we surface the intended IPC method name via StatusBanner and a small delay so
-            // the UI animates. The end-to-end wiring is implemented in MainWindow.
-            await Task.Delay(75);
-            StatusBanner = $"{label} ({method}) complete";
+            var status = await _client.GetGitStatusAsync(EffectiveProjectPath);
+
+            WorkingTree.Clear();
+            foreach (var file in status.Files)
+            {
+                WorkingTree.Add(new GitFileEntryViewModel
+                {
+                    Path = file.Path,
+                    IndexState = file.IndexState,
+                    WorkingTreeState = file.WorkingTreeState,
+                    IsStaged = !string.IsNullOrWhiteSpace(file.IndexState) && file.IndexState != " ",
+                });
+            }
+
+            CurrentBranch = status.CurrentBranch ?? "(detached)";
+            StatusBanner = status.IsRepository
+                ? $"{WorkingTree.Count} change(s) on {CurrentBranch}."
+                : "Not a git repository.";
         }
         catch (Exception ex)
         {
-            StatusBanner = $"{label} failed: {ex.Message}";
+            StatusBanner = $"Refresh failed: {ex.Message}";
         }
         finally
         {
             IsBusy = false;
         }
     }
-}
 
-/// <summary>
-/// Constants for git verbs that are not yet defined in <see cref="NexCode.Shared.Ipc.IpcMethods"/>.
-/// They are pre-declared here so that GUI bindings compile and the helper service can
-/// fill them in over the next slice.
-/// </summary>
-public static class GitExtraIpcMethods
-{
-    public const string GitCommit = "git.commit";
-    public const string GitPush = "git.push";
-    public const string GitPull = "git.pull";
-    public const string GitFetch = "git.fetch";
-    public const string GitBranch = "git.branch";
-    public const string GitRemote = "git.remote";
-    public const string GitStash = "git.stash";
-    public const string GitTag = "git.tag";
-    public const string GitLog = "git.log";
+    private async Task DiffAsync()
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        StatusBanner = "Loading diff...";
+        try
+        {
+            var diff = await _client.GetGitDiffAsync(EffectiveProjectPath);
+            UnifiedDiff = diff.UnifiedDiff;
+            StatusBanner = diff.IsRepository
+                ? (string.IsNullOrWhiteSpace(diff.UnifiedDiff) ? "No changes to diff." : "Diff loaded.")
+                : "Not a git repository.";
+        }
+        catch (Exception ex)
+        {
+            StatusBanner = $"Diff failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task RevertAsync(string? checkpointHash)
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(checkpointHash))
+        {
+            StatusBanner = "Enter a checkpoint commit hash to revert to.";
+            return;
+        }
+
+        IsBusy = true;
+        StatusBanner = $"Reverting to {checkpointHash}...";
+        try
+        {
+            var result = await _client.RevertToCheckpointAsync(EffectiveProjectPath, checkpointHash);
+            StatusBanner = result.Success
+                ? result.Message ?? $"Reverted to {checkpointHash}."
+                : result.Message ?? "Revert failed.";
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusBanner = $"Revert failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void MarkUnsupported() => StatusBanner = NotSupportedMessage;
 }
 
 public sealed partial class GitFileEntryViewModel : ObservableObject

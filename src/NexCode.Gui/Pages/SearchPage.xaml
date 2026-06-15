@@ -3,6 +3,7 @@
     x:Class="NexCode.Gui.Pages.SearchPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:NexCode.Gui.ViewModels.Pages"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
@@ -40,8 +41,38 @@
             BorderBrush="{StaticResource NexCode.Border.Subtle}"
             BorderThickness="1"
             CornerRadius="12">
-            <ListView x:Name="ResultsListView" SelectionMode="Single">
-                <ListViewItem Content="No results yet — type a query and press Enter." IsHitTestVisible="False" />
+            <ListView
+                x:Name="ResultsListView"
+                ItemsSource="{x:Bind Results, Mode=OneWay}"
+                SelectionMode="Single">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SearchHitRowViewModel">
+                        <Grid Padding="12,10" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{x:Bind Snippet}" TextWrapping="Wrap" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{StaticResource NexCode.Text.Secondary}"
+                                    Text="{x:Bind SessionLabel}" />
+                            </StackPanel>
+                            <TextBlock
+                                Grid.Column="1"
+                                Foreground="{StaticResource NexCode.Text.Secondary}"
+                                Text="{x:Bind CreatedAtLabel}"
+                                VerticalAlignment="Center" />
+                            <TextBlock
+                                Grid.Column="2"
+                                Foreground="{StaticResource NexCode.Text.Tertiary}"
+                                Text="{x:Bind ScoreLabel}"
+                                VerticalAlignment="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
             </ListView>
         </Border>
 

@@ -1,4 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using NexCode.Gui.Services;
 using NexCode.Gui.ViewModels.Pages;
 
 namespace NexCode.Gui.Pages;
@@ -16,5 +19,14 @@ public sealed partial class PlansPage : Page
     {
         InitializeComponent();
         DataContext = ViewModel;
+        Loaded += OnLoaded;
+    }
+
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        // Plans are per-session and this page has no session context of its own, so the VM
+        // shows an empty-state prompt until a session id is supplied via LoadAsync.
+        var client = ((App)Application.Current).Services.GetRequiredService<HelperControlClient>();
+        await ViewModel.InitializeAsync(client);
     }
 }

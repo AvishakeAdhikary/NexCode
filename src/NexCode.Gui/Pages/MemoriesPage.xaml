@@ -112,6 +112,11 @@
                         <TextBox Header="Tags (CSV)" Text="{Binding TagsCsv, Mode=OneWay}" IsReadOnly="True" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button
+                                Command="{Binding ElementName=MemoriesListView, Path=DataContext.SaveCommand}"
+                                CommandParameter="{Binding}"
+                                Content="Save"
+                                Style="{ThemeResource AccentButtonStyle}" />
+                            <Button
                                 Command="{Binding ElementName=MemoriesListView, Path=DataContext.CopyUriCommand}"
                                 CommandParameter="{Binding}"
                                 Content="Copy URI" />
