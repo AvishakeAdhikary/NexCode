@@ -186,6 +186,10 @@ public sealed partial class MainWindow : Window
                 ExecutionMode = req.ExecutionMode,
                 SandboxEnabled = req.SandboxEnabled,
             };
+            // Wire the composer to the helper. Without this the Send/Stop commands raise
+            // events that nothing handles, so messages were never dispatched.
+            session.SendMessageRequested += async (_, content) => await SendSessionMessageAsync(session, content);
+            session.StopRequested += async (_, _) => await StopSessionAsync(session);
             _shellViewModel.Sessions.Add(session);
             _shellViewModel.Active = session;
         }
@@ -197,6 +201,30 @@ public sealed partial class MainWindow : Window
         catch
         {
             // Surfaced via helper status label refresh
+        }
+    }
+
+    private async Task SendSessionMessageAsync(SessionViewModel session, string content)
+    {
+        try
+        {
+            await _helperControlClient.SendMessageAsync(new SessionSendMessageRequest(session.SessionId, content));
+        }
+        catch (Exception ex)
+        {
+            session.StatusLine = $"Send failed: {ex.Message}";
+        }
+    }
+
+    private async Task StopSessionAsync(SessionViewModel session)
+    {
+        try
+        {
+            await _helperControlClient.CancelSessionAsync(session.SessionId);
+        }
+        catch (Exception ex)
+        {
+            session.StatusLine = $"Stop failed: {ex.Message}";
         }
     }
 
