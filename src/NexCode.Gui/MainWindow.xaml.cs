@@ -46,6 +46,11 @@ public sealed partial class MainWindow : Window
         _windowSizeConstraintHelper = WindowSizeConstraintHelper.Attach(this, 800, 600);
         Closed += MainWindow_Closed;
 
+        // Extend the Mica Alt backdrop up under a custom title bar so the window
+        // reads as a single Fluent surface instead of a flat bar over content.
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+
         // Theme service binds to the root content for RequestedTheme propagation.
         _themeService.AttachRoot(RootGrid);
 

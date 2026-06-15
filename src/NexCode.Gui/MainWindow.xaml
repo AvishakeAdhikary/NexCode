@@ -10,19 +10,55 @@
     Title="NexCode"
     mc:Ignorable="d">
     <Window.SystemBackdrop>
-        <MicaBackdrop />
+        <MicaBackdrop Kind="BaseAlt" />
     </Window.SystemBackdrop>
 
     <Grid x:Name="RootGrid">
-        <Frame x:Name="ShellFrame" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Custom title bar drag region (content is extended into the title bar). -->
+        <Grid
+            x:Name="AppTitleBar"
+            Grid.Row="0"
+            Height="40"
+            Background="Transparent"
+            ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Image
+                Grid.Column="0"
+                Width="18"
+                Height="18"
+                Margin="14,0,0,0"
+                VerticalAlignment="Center"
+                Source="ms-appx:///Assets/AppIcon.ico" />
+            <TextBlock
+                x:Name="AppTitleTextBlock"
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Text="NexCode" />
+        </Grid>
+
+        <Frame x:Name="ShellFrame" Grid.Row="1" />
 
         <controls:AuthGateOverlay
             x:Name="AuthGate"
+            Grid.Row="0"
+            Grid.RowSpan="2"
             Visibility="Collapsed" />
 
         <controls:SubscriptionGateSheet
             x:Name="SubscriptionGate"
-            Visibility="Collapsed"
-            VerticalAlignment="Bottom" />
+            Grid.Row="0"
+            Grid.RowSpan="2"
+            VerticalAlignment="Bottom"
+            Visibility="Collapsed" />
     </Grid>
 </Window>

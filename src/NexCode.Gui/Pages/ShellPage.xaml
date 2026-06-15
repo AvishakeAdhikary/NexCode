@@ -9,7 +9,7 @@
     mc:Ignorable="d"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    Background="{ThemeResource NexCode.Surface.Background}">
+    Background="Transparent">
 
     <Page.Resources>
         <!-- Per-kind message templates -->
@@ -139,7 +139,7 @@
         <Border
             x:Name="NavRailWide"
             Grid.Column="0"
-            Background="{ThemeResource NexCode.Surface.Card}"
+            Background="Transparent"
             BorderBrush="{ThemeResource NexCode.Border.Subtle}"
             BorderThickness="0,0,1,0">
             <Grid Padding="14" RowSpacing="12">
@@ -213,7 +213,7 @@
             x:Name="NavRailCompact"
             Grid.Column="0"
             Visibility="Collapsed"
-            Background="{ThemeResource NexCode.Surface.Card}"
+            Background="Transparent"
             BorderBrush="{ThemeResource NexCode.Border.Subtle}"
             BorderThickness="0,0,1,0">
             <Grid Padding="6" RowSpacing="6">
@@ -436,7 +436,7 @@
         <Border
             x:Name="ContextHost"
             Grid.Column="2"
-            Background="{ThemeResource NexCode.Surface.Card}"
+            Background="Transparent"
             BorderBrush="{ThemeResource NexCode.Border.Subtle}"
             BorderThickness="1,0,0,0">
             <TabView IsAddTabButtonVisible="False">
