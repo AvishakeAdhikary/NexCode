@@ -19,31 +19,46 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Custom title bar drag region (content is extended into the title bar). -->
-        <Grid
-            x:Name="AppTitleBar"
-            Grid.Row="0"
-            Height="40"
-            Background="Transparent"
-            ColumnSpacing="10">
+        <!-- Custom title bar (content is extended into the title bar). The back button
+             lives outside the drag region so it stays clickable; the rest is draggable. -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="40" Background="Transparent">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Image
+            <Button
+                x:Name="BackButton"
                 Grid.Column="0"
-                Width="18"
-                Height="18"
-                Margin="14,0,0,0"
+                Width="40"
+                Height="32"
+                Margin="6,0,0,0"
+                Padding="0"
                 VerticalAlignment="Center"
-                Source="ms-appx:///Assets/AppIcon.ico" />
-            <TextBlock
-                x:Name="AppTitleTextBlock"
-                Grid.Column="1"
-                VerticalAlignment="Center"
-                Style="{StaticResource CaptionTextBlockStyle}"
-                Text="NexCode" />
+                AutomationProperties.Name="Back to chat"
+                Background="Transparent"
+                BorderThickness="0"
+                Click="BackButton_Click"
+                ToolTipService.ToolTip="Back to chat"
+                Visibility="Collapsed">
+                <FontIcon FontSize="14" Glyph="&#xE72B;" />
+            </Button>
+            <Border x:Name="TitleBarDragRegion" Grid.Column="1" Background="Transparent">
+                <StackPanel
+                    Orientation="Horizontal"
+                    Spacing="10"
+                    VerticalAlignment="Center">
+                    <Image
+                        Width="18"
+                        Height="18"
+                        Margin="8,0,0,0"
+                        Source="ms-appx:///Assets/AppIcon.ico" />
+                    <TextBlock
+                        x:Name="AppTitleTextBlock"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Text="NexCode" />
+                </StackPanel>
+            </Border>
         </Grid>
 
         <Frame x:Name="ShellFrame" Grid.Row="1" />

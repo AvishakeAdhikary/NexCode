@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+- **Working shell navigation.** The left nav rail (Search, History, Plans, Memories,
+  Plugins, Automations, Settings) was previously dead — the view model raised navigation
+  events that nothing handled, and Search/Memories/Plugins/Automations had no command at
+  all. The shell now routes every nav destination through a single `NavigationRequested`
+  event to the shell frame, so those existing pages are reachable. A back button in the
+  title bar returns to the chat (which is cached so its state is preserved).
+
 ### Fixed
 - **Helper "unavailable" flicker.** The background helper's named-pipe server accepted
   connections serially, so while any handler ran (e.g. a Store-backed account snapshot)

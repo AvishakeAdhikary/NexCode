@@ -9,6 +9,7 @@
     mc:Ignorable="d"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    NavigationCacheMode="Enabled"
     Background="Transparent">
 
     <Page.Resources>
@@ -189,12 +190,12 @@
 
                         <StackPanel Spacing="2">
                             <TextBlock Style="{StaticResource NexCode.Caption}" Text="NAVIGATION" />
-                            <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Content="Search" />
+                            <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{x:Bind ViewModel.OpenSearchCommand}" Content="Search" />
                             <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{x:Bind ViewModel.OpenHistoryCommand}" Content="History" />
                             <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{x:Bind ViewModel.OpenPlansCommand}" Content="Plans" />
-                            <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Content="Memories" />
-                            <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Content="Plugins" />
-                            <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Content="Automations" />
+                            <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{x:Bind ViewModel.OpenMemoriesCommand}" Content="Memories" />
+                            <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{x:Bind ViewModel.OpenPluginsCommand}" Content="Plugins" />
+                            <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{x:Bind ViewModel.OpenAutomationsCommand}" Content="Automations" />
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
@@ -232,7 +233,7 @@
                 </Button>
 
                 <StackPanel Grid.Row="1" Spacing="4" Margin="0,8,0,0">
-                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Search">
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.OpenSearchCommand}" ToolTipService.ToolTip="Search">
                         <FontIcon FontSize="14" Glyph="&#xE721;" />
                     </Button>
                     <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.OpenHistoryCommand}" ToolTipService.ToolTip="History">
@@ -241,13 +242,13 @@
                     <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.OpenPlansCommand}" ToolTipService.ToolTip="Plans">
                         <FontIcon FontSize="14" Glyph="&#xE8A5;" />
                     </Button>
-                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Memories">
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.OpenMemoriesCommand}" ToolTipService.ToolTip="Memories">
                         <FontIcon FontSize="14" Glyph="&#xE7B8;" />
                     </Button>
-                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Plugins">
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.OpenPluginsCommand}" ToolTipService.ToolTip="Plugins">
                         <FontIcon FontSize="14" Glyph="&#xE950;" />
                     </Button>
-                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" ToolTipService.ToolTip="Automations">
+                    <Button Style="{StaticResource NexCode.Button.Tertiary}" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.OpenAutomationsCommand}" ToolTipService.ToolTip="Automations">
                         <FontIcon FontSize="14" Glyph="&#xE945;" />
                     </Button>
                 </StackPanel>

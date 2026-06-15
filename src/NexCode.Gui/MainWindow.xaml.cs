@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Navigation;
 using NexCode.Gui.Auth;
 using NexCode.Gui.Infrastructure;
 using NexCode.Gui.Pages;
@@ -49,7 +50,7 @@ public sealed partial class MainWindow : Window
         // Extend the Mica Alt backdrop up under a custom title bar so the window
         // reads as a single Fluent surface instead of a flat bar over content.
         ExtendsContentIntoTitleBar = true;
-        SetTitleBar(AppTitleBar);
+        SetTitleBar(TitleBarDragRegion);
 
         // Theme service binds to the root content for RequestedTheme propagation.
         _themeService.AttachRoot(RootGrid);
@@ -69,6 +70,10 @@ public sealed partial class MainWindow : Window
         SubscriptionGate.UpgradeTeamRequested += async (_, _) => await StartStorePurchaseAsync("nexcode_team_monthly");
         SubscriptionGate.RestoreRequested += async (_, _) => await DoRefreshSubscriptionAsync();
         SubscriptionGate.DismissRequested += (_, _) => SubscriptionGate.Visibility = Visibility.Collapsed;
+
+        // Nav-rail destinations: map to pages and drive the shell frame.
+        _shellViewModel.NavigationRequested += OnNavigationRequested;
+        ShellFrame.Navigated += OnShellFrameNavigated;
 
         // Navigate to ShellPage and pass the view model.
         ShellFrame.Navigate(typeof(ShellPage), _shellViewModel);
@@ -374,6 +379,48 @@ public sealed partial class MainWindow : Window
         SubscriptionTier.Team => "nexcode_team_monthly",
         _ => "nexcode_pro_monthly"
     };
+
+    private void OnNavigationRequested(object? sender, ShellDestination destination)
+    {
+        var pageType = destination switch
+        {
+            ShellDestination.Search => typeof(SearchPage),
+            ShellDestination.History => typeof(HistoryPage),
+            ShellDestination.Plans => typeof(PlansPage),
+            ShellDestination.Memories => typeof(MemoriesPage),
+            ShellDestination.Plugins => typeof(PluginsPage),
+            ShellDestination.Automations => typeof(AutomationsPage),
+            ShellDestination.Settings => typeof(SettingsPage),
+            _ => null
+        };
+
+        if (pageType is null || ShellFrame.CurrentSourcePageType == pageType)
+        {
+            return;
+        }
+
+        ShellFrame.Navigate(pageType);
+
+        // Keep only the chat shell on the back stack so Back always returns to chat
+        // rather than chaining between secondary pages.
+        while (ShellFrame.BackStack.Count > 1)
+        {
+            ShellFrame.BackStack.RemoveAt(ShellFrame.BackStack.Count - 1);
+        }
+    }
+
+    private void OnShellFrameNavigated(object sender, NavigationEventArgs e)
+    {
+        BackButton.Visibility = ShellFrame.CanGoBack ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void BackButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ShellFrame.CanGoBack)
+        {
+            ShellFrame.GoBack();
+        }
+    }
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {

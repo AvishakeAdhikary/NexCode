@@ -65,10 +65,9 @@ public sealed partial class ShellViewModel : ObservableViewModelBase
         _dispatcher = dispatcher;
     }
 
-    public event EventHandler? NavigateToProjectsRequested;
-    public event EventHandler? NavigateToHistoryRequested;
-    public event EventHandler? NavigateToPlansRequested;
-    public event EventHandler? NavigateToSettingsRequested;
+    /// <summary>Raised when a nav-rail destination is chosen. The host (MainWindow) maps the
+    /// destination to a page and navigates the shell frame.</summary>
+    public event EventHandler<ShellDestination>? NavigationRequested;
 
     public event EventHandler<string>? SignInRequested;
     public event EventHandler? RestorePurchasesRequested;
@@ -86,16 +85,25 @@ public sealed partial class ShellViewModel : ObservableViewModelBase
     }
 
     [RelayCommand]
-    private void OpenProjects() => NavigateToProjectsRequested?.Invoke(this, EventArgs.Empty);
+    private void OpenSearch() => NavigationRequested?.Invoke(this, ShellDestination.Search);
 
     [RelayCommand]
-    private void OpenHistory() => NavigateToHistoryRequested?.Invoke(this, EventArgs.Empty);
+    private void OpenHistory() => NavigationRequested?.Invoke(this, ShellDestination.History);
 
     [RelayCommand]
-    private void OpenPlans() => NavigateToPlansRequested?.Invoke(this, EventArgs.Empty);
+    private void OpenPlans() => NavigationRequested?.Invoke(this, ShellDestination.Plans);
 
     [RelayCommand]
-    private void OpenSettings() => NavigateToSettingsRequested?.Invoke(this, EventArgs.Empty);
+    private void OpenMemories() => NavigationRequested?.Invoke(this, ShellDestination.Memories);
+
+    [RelayCommand]
+    private void OpenPlugins() => NavigationRequested?.Invoke(this, ShellDestination.Plugins);
+
+    [RelayCommand]
+    private void OpenAutomations() => NavigationRequested?.Invoke(this, ShellDestination.Automations);
+
+    [RelayCommand]
+    private void OpenSettings() => NavigationRequested?.Invoke(this, ShellDestination.Settings);
 
     [RelayCommand]
     private void SignIn() => SignInRequested?.Invoke(this, "interactive");
@@ -152,3 +160,15 @@ public sealed record NewSessionRequest(
     SessionMode Mode,
     ExecutionMode ExecutionMode,
     bool SandboxEnabled);
+
+/// <summary>Nav-rail destinations reachable from the shell. Mapped to pages by the host.</summary>
+public enum ShellDestination
+{
+    Search,
+    History,
+    Plans,
+    Memories,
+    Plugins,
+    Automations,
+    Settings,
+}
