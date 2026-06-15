@@ -12,8 +12,30 @@
 - **AI provider configuration (end-to-end).** Settings → Providers was a stub ("wire-up
   pending"). It now loads the configured providers from the helper, and Add/Save/Remove/
   Set-default persist through `provider.list/upsert/remove/set_default` over IPC (a Save
-  button was added; API keys are sent to the helper, which stores them encrypted). This is
-  the prerequisite for the chat to reach any model.
+  button was added; API keys are sent to the helper, which stores them encrypted).
+- **~50 IPC client methods.** `HelperControlClient` exposed only ~11 of the ~80 backend
+  handlers, leaving most pages unable to reach existing functionality. Added client methods
+  (reusing the existing `NexCode.Shared.Contracts`) for memory, history, plans/todos, git
+  (status/diff/revert), modes, personalities, MCP, environments, telemetry, plugins,
+  automations, sub-agents, editor, terminal, and remote/cloud.
+- **Wired panels** (real IPC, no more placeholders): **Memories** (list/write/delete),
+  **History** (list/search/archive/delete/export), **Search** (history.search),
+  **Plans** (list/get/confirm/request-changes), **Git** (status/diff/revert).
+- **Wired settings** (real IPC): **Modes**, **Personalities**, **MCP servers**,
+  **Environments**, **Privacy/Telemetry**, **Plugins**, **Automations** — each loads on
+  activation and persists CRUD through its existing handler. Local stub records that
+  shadowed the real contracts were removed.
+- **System accent color.** The app now follows the Windows accent (Light/Dark/HighContrast
+  aware), with live updates on `UISettings.ColorValuesChanged`.
+- **Microsoft sign-in config.** Azure AD client/tenant + `http://localhost` loopback redirect
+  wired through `appsettings.Local.json` (gitignored); the `common` authority allows personal
+  and any-org accounts.
+
+### Fixed
+- **Chat send/stop did nothing.** `SessionViewModel` raised `SendMessageRequested`/
+  `StopRequested` that `MainWindow` never subscribed to, so the chat loop was dead
+  end-to-end. The composer now dispatches `session.send_message` / `session.cancel`, and the
+  streamed token/checkpoint events render back into the transcript.
 
 ### Fixed
 - **Helper "unavailable" flicker.** The background helper's named-pipe server accepted
