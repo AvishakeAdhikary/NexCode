@@ -24,6 +24,9 @@
             <SolidColorBrush x:Key="NexCode.Status.Error" Color="#F85149" />
             <SolidColorBrush x:Key="NexCode.Status.Info" Color="#58A6FF" />
 
+            <!-- Accent.Primary/Hover/Press are overridden at runtime from the Windows system
+                 accent by ThemeService; these values are the design-time / fallback defaults.
+                 Accent.Subtle is a background tint and is intentionally left as-is. -->
             <SolidColorBrush x:Key="NexCode.Accent.Primary" Color="#2F81F7" />
             <SolidColorBrush x:Key="NexCode.Accent.Subtle" Color="#1F2D44" />
             <SolidColorBrush x:Key="NexCode.Accent.Hover" Color="#388BFD" />
@@ -49,6 +52,9 @@
             <SolidColorBrush x:Key="NexCode.Status.Error" Color="#CF222E" />
             <SolidColorBrush x:Key="NexCode.Status.Info" Color="#0969DA" />
 
+            <!-- Accent.Primary/Hover/Press are overridden at runtime from the Windows system
+                 accent by ThemeService; these values are the design-time / fallback defaults.
+                 Accent.Subtle is a background tint and is intentionally left as-is. -->
             <SolidColorBrush x:Key="NexCode.Accent.Primary" Color="#0969DA" />
             <SolidColorBrush x:Key="NexCode.Accent.Subtle" Color="#DDF4FF" />
             <SolidColorBrush x:Key="NexCode.Accent.Hover" Color="#0860C7" />
