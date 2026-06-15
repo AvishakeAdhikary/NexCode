@@ -9,6 +9,11 @@
   all. The shell now routes every nav destination through a single `NavigationRequested`
   event to the shell frame, so those existing pages are reachable. A back button in the
   title bar returns to the chat (which is cached so its state is preserved).
+- **AI provider configuration (end-to-end).** Settings → Providers was a stub ("wire-up
+  pending"). It now loads the configured providers from the helper, and Add/Save/Remove/
+  Set-default persist through `provider.list/upsert/remove/set_default` over IPC (a Save
+  button was added; API keys are sent to the helper, which stores them encrypted). This is
+  the prerequisite for the chat to reach any model.
 
 ### Fixed
 - **Helper "unavailable" flicker.** The background helper's named-pipe server accepted

@@ -73,6 +73,38 @@ public sealed class HelperControlClient
             cancellationToken);
     }
 
+    public Task<ProviderListResponse> ListProvidersAsync(CancellationToken cancellationToken = default)
+    {
+        return SendRequestAsync<ProviderListResponse>(IpcMethods.ProviderList, cancellationToken);
+    }
+
+    public Task<ProviderUpsertResponse> UpsertProviderAsync(
+        ProviderUpsertRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return SendRequestAsync<ProviderUpsertResponse>(IpcMethods.ProviderUpsert, request, cancellationToken);
+    }
+
+    public Task<ProviderRemoveResponse> RemoveProviderAsync(
+        string providerKey,
+        CancellationToken cancellationToken = default)
+    {
+        return SendRequestAsync<ProviderRemoveResponse>(
+            IpcMethods.ProviderRemove,
+            new ProviderRemoveRequest(providerKey),
+            cancellationToken);
+    }
+
+    public Task<ProviderSetDefaultResponse> SetDefaultProviderAsync(
+        string providerKey,
+        CancellationToken cancellationToken = default)
+    {
+        return SendRequestAsync<ProviderSetDefaultResponse>(
+            IpcMethods.ProviderSetDefault,
+            new ProviderSetDefaultRequest(providerKey),
+            cancellationToken);
+    }
+
     private static async Task<NamedPipeClientStream> ConnectAsync(CancellationToken cancellationToken)
     {
         for (var attempt = 1; ; attempt++)

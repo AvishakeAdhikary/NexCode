@@ -31,4 +31,8 @@ public sealed record ProviderUpsertResponse(
 
 public sealed record ProviderRemoveRequest(string ProviderKey);
 
+public sealed record ProviderRemoveResponse(string ProviderKey, bool Removed);
+
 public sealed record ProviderSetDefaultRequest(string ProviderKey);
+
+public sealed record ProviderSetDefaultResponse(string ProviderKey, bool IsDefault);

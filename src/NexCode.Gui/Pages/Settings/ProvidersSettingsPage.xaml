@@ -110,6 +110,11 @@
 
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button
+                                Command="{Binding ElementName=ProvidersListView, Path=DataContext.SaveProviderCommand}"
+                                CommandParameter="{Binding}"
+                                Content="Save"
+                                Style="{StaticResource AccentButtonStyle}" />
+                            <Button
                                 Command="{Binding ElementName=ProvidersListView, Path=DataContext.SetDefaultCommand}"
                                 CommandParameter="{Binding}"
                                 Content="Set as default" />

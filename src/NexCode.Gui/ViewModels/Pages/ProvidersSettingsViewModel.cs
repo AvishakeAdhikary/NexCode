@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NexCode.Gui.Services;
 using NexCode.Shared.Contracts;
 
 namespace NexCode.Gui.ViewModels.Pages;
@@ -31,6 +32,44 @@ public sealed partial class ProvidersSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isBusy;
 
+    private HelperControlClient? _client;
+
+    /// <summary>Called by the page on activation: binds the helper transport and loads the list.</summary>
+    public async Task InitializeAsync(HelperControlClient client)
+    {
+        _client = client;
+        await LoadAsync();
+    }
+
+    [RelayCommand]
+    private async Task Reload() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var response = await _client.ListProvidersAsync();
+            ApplyListResponse(response);
+            StatusMessage = Providers.Count == 0
+                ? "No providers configured yet. Add one and save to start chatting."
+                : $"Loaded {Providers.Count} provider(s).";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not load providers: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     [RelayCommand]
     private void AddProvider()
     {
@@ -45,46 +84,131 @@ public sealed partial class ProvidersSettingsViewModel : ObservableObject
         };
         Providers.Add(row);
         SelectedProvider = row;
+        StatusMessage = "Fill in the details and click Save to persist this provider.";
     }
 
     [RelayCommand]
-    private void RemoveProvider(ProviderRowViewModel? row)
+    private async Task SaveProvider(ProviderRowViewModel? row)
     {
+        row ??= SelectedProvider;
+        if (row is null)
+        {
+            StatusMessage = "Select a provider to save.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(row.ProviderKey))
+        {
+            StatusMessage = "A provider type is required.";
+            return;
+        }
+
+        if (_client is null)
+        {
+            StatusMessage = "Helper unavailable; cannot save.";
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            await _client.UpsertProviderAsync(row.ToUpsertRequest());
+            await LoadAsync();
+            StatusMessage = $"Saved {row.DisplayName}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Save failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task RemoveProvider(ProviderRowViewModel? row)
+    {
+        row ??= SelectedProvider;
         if (row is null)
         {
             return;
         }
 
-        Providers.Remove(row);
-        if (SelectedProvider == row)
+        if (_client is null)
         {
-            SelectedProvider = null;
+            Providers.Remove(row);
+            if (SelectedProvider == row)
+            {
+                SelectedProvider = null;
+            }
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(row.ProviderKey))
+            {
+                await _client.RemoveProviderAsync(row.ProviderKey);
+            }
+            await LoadAsync();
+            StatusMessage = $"Removed {row.DisplayName}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Remove failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
     [RelayCommand]
-    private void SetDefault(ProviderRowViewModel? row)
+    private async Task SetDefault(ProviderRowViewModel? row)
     {
-        if (row is null)
+        row ??= SelectedProvider;
+        if (row is null || string.IsNullOrWhiteSpace(row.ProviderKey))
         {
             return;
         }
 
-        foreach (var p in Providers)
+        if (_client is null)
         {
-            p.IsDefault = false;
+            foreach (var p in Providers)
+            {
+                p.IsDefault = false;
+            }
+            row.IsDefault = true;
+            return;
         }
 
-        row.IsDefault = true;
-        StatusMessage = $"Default provider set to {row.DisplayName} (wire-up pending).";
+        IsBusy = true;
+        try
+        {
+            await _client.SetDefaultProviderAsync(row.ProviderKey);
+            await LoadAsync();
+            StatusMessage = $"Default provider set to {row.DisplayName}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Set default failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand]
     private void TestConnection(ProviderRowViewModel? row)
     {
+        // No dedicated provider-test IPC endpoint exists yet; validation happens when a
+        // session is started against the provider. Keep the message honest.
         StatusMessage = row is null
             ? "Select a provider to test."
-            : $"Testing {row.DisplayName}... (wire-up pending).";
+            : $"Save {row.DisplayName}, then start a session to validate the connection.";
     }
 
     /// <summary>Hydrates the panel from a <see cref="ProviderListResponse"/>.</summary>
